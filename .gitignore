@@ -1,0 +1,60 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.python-version
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+venv/
+ENV/
+env/
+
+# Env files (keep examples)
+.env
+.env.*
+!.env.example
+aether/.env
+aether/.env.*
+!aether/.env.example
+
+# Build / logs / runtime
+*.log
+*.out
+*.err
+*.pid
+*.pid.lock
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Tool caches
+.cache/
+.parcel-cache/
+
+# Optional local outputs
+aether/scenario_output.json
+aether/demo_live_server_output.json
