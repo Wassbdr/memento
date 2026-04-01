@@ -7,9 +7,12 @@ from .capture import (
     MicrophoneConfig,
     RealTimeMicrophone,
 )
+from .io import WavAudio, load_wav_bytes, speech_segment_from_wav_bytes, write_wav_file
 from .models import AudioFrame
 from .transcription import (
+    FasterWhisperBackend,
     SegmentTranscription,
+    TranscribedWord,
     WhisperBackend,
     WhisperBackendResult,
     WhisperConfig,
@@ -24,15 +27,21 @@ __all__ = [
     "CaptureHealthReport",
     "CaptureHealthSnapshot",
     "EnergyVAD",
+    "FasterWhisperBackend",
     "MicrophoneConfig",
     "RealTimeMicrophone",
     "SegmentTranscription",
     "SpeechSegment",
+    "TranscribedWord",
     "VoiceActivityConfig",
     "VoiceActivityDecision",
+    "WavAudio",
     "WhisperBackend",
     "WhisperBackendResult",
     "WhisperConfig",
     "WhisperTranscriber",
     "WhisperTranscriptionPipeline",
+    "load_wav_bytes",
+    "speech_segment_from_wav_bytes",
+    "write_wav_file",
 ]

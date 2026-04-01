@@ -16,3 +16,34 @@ Micro → Whisper + VAD
          Voxtral TTS
               ↓
            Haut-parleur
+
+## Comment tester
+
+### Installer l'environnement
+
+```bash
+uv sync
+```
+
+### Lancer les tests unitaires
+
+```bash
+uv run python -m pytest
+```
+
+### Tester la transcription micro avec Streamlit
+
+```bash
+uv run streamlit run experimentations/streamlit_whisper_app.py
+```
+
+Ensuite :
+- autoriser l'acces au microphone dans le navigateur
+- enregistrer une phrase avec le bouton de capture
+- cliquer sur `Transcribe`
+- lire la transcription mot par mot puis la transcription complete
+
+Notes :
+- au premier lancement, `faster-whisper` peut telecharger le modele choisi
+- le mode `cpu` est le plus simple pour demarrer
+- les modeles `tiny`, `base` ou `small` sont de bons points de depart pour les essais rapides
