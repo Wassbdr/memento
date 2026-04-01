@@ -8,9 +8,10 @@ from .capture import (
     RealTimeMicrophone,
 )
 from .io import WavAudio, load_wav_bytes, speech_segment_from_wav_bytes, write_wav_file
+from .live import InputDeviceInfo, SoundDeviceInput, StreamingSpeechSegmenter, list_input_devices
 from .models import AudioFrame
 from .transcription import (
-    FasterWhisperBackend,
+    OpenAIWhisperBackend,
     SegmentTranscription,
     TranscribedWord,
     WhisperBackend,
@@ -18,6 +19,9 @@ from .transcription import (
     WhisperConfig,
     WhisperTranscriptionPipeline,
     WhisperTranscriber,
+    is_cuda_runtime_error,
+    is_missing_ffmpeg_error,
+    torch_cuda_available,
 )
 from .vad import EnergyVAD, SpeechSegment, VoiceActivityConfig, VoiceActivityDecision
 
@@ -27,11 +31,14 @@ __all__ = [
     "CaptureHealthReport",
     "CaptureHealthSnapshot",
     "EnergyVAD",
-    "FasterWhisperBackend",
+    "InputDeviceInfo",
+    "OpenAIWhisperBackend",
     "MicrophoneConfig",
     "RealTimeMicrophone",
     "SegmentTranscription",
+    "SoundDeviceInput",
     "SpeechSegment",
+    "StreamingSpeechSegmenter",
     "TranscribedWord",
     "VoiceActivityConfig",
     "VoiceActivityDecision",
@@ -41,6 +48,10 @@ __all__ = [
     "WhisperConfig",
     "WhisperTranscriber",
     "WhisperTranscriptionPipeline",
+    "is_cuda_runtime_error",
+    "is_missing_ffmpeg_error",
+    "list_input_devices",
+    "torch_cuda_available",
     "load_wav_bytes",
     "speech_segment_from_wav_bytes",
     "write_wav_file",

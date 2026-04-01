@@ -1,12 +1,10 @@
 import sys
-import types
 from dataclasses import dataclass
-from pathlib import Path
 
 from memento.audio import (
     AudioFrame,
     EnergyVAD,
-    FasterWhisperBackend,
+    OpenAIWhisperBackend,
     SpeechSegment,
     TranscribedWord,
     VoiceActivityConfig,
@@ -14,6 +12,9 @@ from memento.audio import (
     WhisperConfig,
     WhisperTranscriber,
     WhisperTranscriptionPipeline,
+    is_cuda_runtime_error,
+    is_missing_ffmpeg_error,
+    torch_cuda_available,
 )
 
 
@@ -60,7 +61,7 @@ def test_whisper_transcriber_calls_backend_and_returns_metadata() -> None:
     transcriber = WhisperTranscriber(
         backend=backend,
         config=WhisperConfig(
-            model_name="whisper-small",
+            model_name="small",
             language="fr",
             prompt="Contexte patient",
             min_segment_duration_ms=0,
@@ -72,7 +73,7 @@ def test_whisper_transcriber_calls_backend_and_returns_metadata() -> None:
 
     assert result is not None
     assert result.text == "bonjour maman"
-    assert result.model_name == "whisper-small"
+    assert result.model_name == "small"
     assert result.sample_rate_hz == 100
     assert result.start_frame_index == 3
     assert result.end_frame_index == 4
@@ -82,6 +83,58 @@ def test_whisper_transcriber_calls_backend_and_returns_metadata() -> None:
     assert backend.calls[0]["language"] == "fr"
     assert backend.calls[0]["prompt"] == "Contexte patient"
     assert backend.calls[0]["samples"] == segment.samples
+
+
+def test_whisper_config_defaults_to_large_v3() -> None:
+    config = WhisperConfig()
+
+    assert config.model_name == "large-v3"
+
+
+def test_whisper_config_normalizes_legacy_prefixed_model_names() -> None:
+    config = WhisperConfig(model_name="whisper-large-v3")
+
+    assert config.model_name == "large-v3"
+
+
+def test_detects_missing_cuda_runtime_errors() -> None:
+    error = RuntimeError("Library cublas64_12.dll is not found or cannot be loaded")
+
+    assert is_cuda_runtime_error(error) is True
+
+
+def test_detects_torch_cuda_deserialization_errors() -> None:
+    error = RuntimeError(
+        "Attempting to deserialize object on a CUDA device but torch.cuda.is_available() is False"
+    )
+
+    assert is_cuda_runtime_error(error) is True
+
+
+def test_ignores_non_cuda_runtime_errors() -> None:
+    error = RuntimeError("openai-whisper is not installed")
+
+    assert is_cuda_runtime_error(error) is False
+
+
+def test_detects_missing_ffmpeg_errors() -> None:
+    error = FileNotFoundError("[WinError 2] The system cannot find the file specified: 'ffmpeg'")
+
+    assert is_missing_ffmpeg_error(error) is True
+
+
+def test_torch_cuda_available_reads_torch_state(monkeypatch) -> None:
+    class FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+    class FakeTorch:
+        cuda = FakeCuda()
+
+    monkeypatch.setitem(sys.modules, "torch", FakeTorch)
+
+    assert torch_cuda_available() is False
 
 
 def test_whisper_transcriber_skips_segments_shorter_than_min_duration() -> None:
@@ -130,62 +183,50 @@ def test_transcription_pipeline_uses_vad_segments() -> None:
     assert results[0].end_frame_index == 2
 
 
-def test_faster_whisper_backend_wraps_real_runtime_contract(monkeypatch) -> None:
-    class FakeWord:
-        def __init__(self, word: str, start: float, end: float, probability: float) -> None:
-            self.word = word
-            self.start = start
-            self.end = end
-            self.probability = probability
-
-    class FakeSegment:
-        def __init__(self, text: str, words: list[FakeWord]) -> None:
-            self.text = text
-            self.words = words
-
-    class FakeInfo:
-        language_probability = 0.77
-
+def test_openai_whisper_backend_wraps_real_runtime_contract(monkeypatch) -> None:
     class FakeWhisperModel:
-        last_init: dict[str, object] | None = None
         transcribe_calls: list[dict[str, object]] = []
-
-        def __init__(self, model_name: str, device: str, compute_type: str) -> None:
-            type(self).last_init = {
-                "model_name": model_name,
-                "device": device,
-                "compute_type": compute_type,
-            }
 
         def transcribe(self, audio_path: str, **kwargs):
             type(self).transcribe_calls.append({"audio_path": audio_path, **kwargs})
-            assert Path(audio_path).exists()
-            return iter(
-                [
-                    FakeSegment(
-                        "bonjour maman",
-                        [
-                            FakeWord("bonjour", 0.0, 0.25, 0.95),
-                            FakeWord("maman", 0.25, 0.5, 0.85),
+            assert hasattr(audio_path, "shape")
+            return {
+                "text": "bonjour maman",
+                "segments": [
+                    {
+                        "text": "bonjour maman",
+                        "avg_logprob": -0.15,
+                        "words": [
+                            {"word": "bonjour", "start": 0.0, "end": 0.25, "probability": 0.95},
+                            {"word": "maman", "start": 0.25, "end": 0.5, "probability": 0.85},
                         ],
-                    )
-                ]
-            ), FakeInfo()
+                    }
+                ],
+            }
 
-    fake_module = types.SimpleNamespace(WhisperModel=FakeWhisperModel)
-    monkeypatch.setitem(sys.modules, "faster_whisper", fake_module)
+    class FakeWhisperModule:
+        last_load_model: dict[str, object] | None = None
 
-    backend = FasterWhisperBackend(
+        @staticmethod
+        def load_model(model_name: str, device: str) -> FakeWhisperModel:
+            FakeWhisperModule.last_load_model = {
+                "model_name": model_name,
+                "device": device,
+            }
+            return FakeWhisperModel()
+
+    monkeypatch.setitem(sys.modules, "whisper", FakeWhisperModule)
+
+    backend = OpenAIWhisperBackend(
         WhisperConfig(
-            model_name="small",
+            model_name="large-v3",
             language="fr",
             prompt="contexte",
             device="cpu",
-            compute_type="int8",
+            fp16=False,
             beam_size=3,
             word_timestamps=True,
             condition_on_previous_text=False,
-            vad_filter=False,
             min_segment_duration_ms=0,
         )
     )
@@ -197,14 +238,14 @@ def test_faster_whisper_backend_wraps_real_runtime_contract(monkeypatch) -> None
         prompt="bonjour",
     )
 
-    assert FakeWhisperModel.last_init == {
-        "model_name": "small",
+    assert FakeWhisperModule.last_load_model == {
+        "model_name": "large-v3",
         "device": "cpu",
-        "compute_type": "int8",
     }
     assert FakeWhisperModel.transcribe_calls[0]["language"] == "fr"
     assert FakeWhisperModel.transcribe_calls[0]["initial_prompt"] == "bonjour"
     assert FakeWhisperModel.transcribe_calls[0]["beam_size"] == 3
+    assert FakeWhisperModel.transcribe_calls[0]["fp16"] is False
     assert result.text == "bonjour maman"
     assert result.confidence == 0.9
     assert tuple(word.word for word in result.words) == ("bonjour", "maman")

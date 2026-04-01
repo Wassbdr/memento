@@ -5,15 +5,25 @@ description = "Prototype d'assistant vocal memoire pour patients atteints de la 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "faster-whisper>=1.2.0",
+    "openai-whisper>=20250625",
     "pillow<12",
+    "sounddevice>=0.5.2",
     "streamlit>=1.55.0",
+    "torch==2.11.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.4.0",
 ]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

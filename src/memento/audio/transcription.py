@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib import import_module
+from math import exp
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import perf_counter
@@ -13,22 +14,46 @@ from .io import write_wav_file
 from .vad import EnergyVAD, SpeechSegment
 
 
+DEFAULT_WHISPER_MODEL_NAME = "large-v3"
+CUDA_RUNTIME_ERROR_MARKERS = (
+    "attempting to deserialize object on a cuda device",
+    "cublas64_12.dll",
+    "cudnn",
+    "cuda driver",
+    "cuda runtime",
+    "cuda is not available",
+    "found no nvidia driver",
+    "libcublas",
+    "libcudnn",
+    "torch.cuda.is_available() is false",
+    "torch not compiled with cuda",
+)
+FFMPEG_ERROR_MARKERS = ("ffmpeg",)
+
+
 @dataclass(frozen=True)
 class WhisperConfig:
     """Settings for a Whisper-compatible transcription backend."""
 
-    model_name: str = "whisper-base"
+    model_name: str = DEFAULT_WHISPER_MODEL_NAME
     language: str = "fr"
     prompt: str = ""
     min_segment_duration_ms: float = 150.0
     device: str = "cpu"
-    compute_type: str = "int8"
+    fp16: bool = False
     beam_size: int = 5
     word_timestamps: bool = True
     condition_on_previous_text: bool = False
-    vad_filter: bool = False
 
     def __post_init__(self) -> None:
+        normalized_model_name = _normalize_model_name(self.model_name)
+        if not normalized_model_name:
+            raise ValueError("model_name must not be empty")
+        object.__setattr__(self, "model_name", normalized_model_name)
+        normalized_device = self.device.strip().lower()
+        if not normalized_device:
+            raise ValueError("device must not be empty")
+        object.__setattr__(self, "device", normalized_device)
         if self.min_segment_duration_ms < 0:
             raise ValueError("min_segment_duration_ms must be non-negative")
         if self.beam_size <= 0:
@@ -136,8 +161,8 @@ class WhisperTranscriptionPipeline:
         return tuple(results)
 
 
-class FasterWhisperBackend:
-    """Real Whisper backend powered by faster-whisper."""
+class OpenAIWhisperBackend:
+    """Real Whisper backend powered by the official openai-whisper package."""
 
     def __init__(self, config: WhisperConfig | None = None) -> None:
         self._config = config or WhisperConfig()
@@ -154,18 +179,32 @@ class FasterWhisperBackend:
         language: str,
         prompt: str,
     ) -> WhisperBackendResult:
-        with NamedTemporaryFile(suffix=".wav", delete=False) as temporary_file:
-            temp_path = Path(temporary_file.name)
+        if sample_rate_hz != 16_000:
+            with NamedTemporaryFile(suffix=".wav", delete=False) as temporary_file:
+                temp_path = Path(temporary_file.name)
 
-        try:
-            write_wav_file(
-                path=temp_path,
-                samples=samples,
-                sample_rate_hz=sample_rate_hz,
-            )
-            return self.transcribe_file(temp_path, language=language, prompt=prompt)
-        finally:
-            temp_path.unlink(missing_ok=True)
+            try:
+                write_wav_file(
+                    path=temp_path,
+                    samples=samples,
+                    sample_rate_hz=sample_rate_hz,
+                )
+                return self.transcribe_file(temp_path, language=language, prompt=prompt)
+            finally:
+                temp_path.unlink(missing_ok=True)
+
+        model = self._get_model()
+        result = model.transcribe(
+            _samples_to_numpy(samples),
+            language=language or self._config.language,
+            initial_prompt=prompt or self._config.prompt or None,
+            beam_size=self._config.beam_size,
+            word_timestamps=self._config.word_timestamps,
+            condition_on_previous_text=self._config.condition_on_previous_text,
+            fp16=self._config.fp16,
+            verbose=False,
+        )
+        return self._normalize_result(result)
 
     def transcribe_file(
         self,
@@ -175,50 +214,73 @@ class FasterWhisperBackend:
         prompt: str = "",
     ) -> WhisperBackendResult:
         model = self._get_model()
-        segments, info = model.transcribe(
-            str(audio_path),
-            language=language or self._config.language,
-            initial_prompt=prompt or self._config.prompt or None,
-            beam_size=self._config.beam_size,
-            word_timestamps=self._config.word_timestamps,
-            condition_on_previous_text=self._config.condition_on_previous_text,
-            vad_filter=self._config.vad_filter,
-        )
-        collected_segments = list(segments)
-        text = " ".join(segment.text.strip() for segment in collected_segments if segment.text.strip())
+        try:
+            result = model.transcribe(
+                str(audio_path),
+                language=language or self._config.language,
+                initial_prompt=prompt or self._config.prompt or None,
+                beam_size=self._config.beam_size,
+                word_timestamps=self._config.word_timestamps,
+                condition_on_previous_text=self._config.condition_on_previous_text,
+                fp16=self._config.fp16,
+                verbose=False,
+            )
+        except FileNotFoundError as exc:
+            if is_missing_ffmpeg_error(exc):
+                raise RuntimeError(
+                    "ffmpeg is required by openai-whisper but was not found in PATH. "
+                    "Install ffmpeg, then retry."
+                ) from exc
+            raise
+
+        return self._normalize_result(result)
+
+    def _normalize_result(self, result: dict) -> WhisperBackendResult:
+        collected_segments = list(result.get("segments", []) or [])
+        text = str(result.get("text", "")).strip()
+        if not text:
+            text = " ".join(
+                str(segment.get("text", "")).strip()
+                for segment in collected_segments
+                if str(segment.get("text", "")).strip()
+            )
 
         words: list[TranscribedWord] = []
         for segment in collected_segments:
-            for word in getattr(segment, "words", []) or []:
+            for word in segment.get("words", []) or []:
                 words.append(
                     TranscribedWord(
-                        word=str(getattr(word, "word", "")).strip(),
-                        start_ms=_seconds_to_ms(getattr(word, "start", None)),
-                        end_ms=_seconds_to_ms(getattr(word, "end", None)),
-                        probability=getattr(word, "probability", None),
+                        word=str(word.get("word", "")).strip(),
+                        start_ms=_seconds_to_ms(word.get("start")),
+                        end_ms=_seconds_to_ms(word.get("end")),
+                        probability=word.get("probability"),
                     )
                 )
 
-        confidence = _compute_confidence(words, info)
+        confidence = _compute_confidence(words, collected_segments)
         return WhisperBackendResult(text=text, confidence=confidence, words=tuple(words))
 
     def _get_model(self):
         if self._model is None:
-            module = self._import_faster_whisper()
-            self._model = module.WhisperModel(
+            if self._config.device == "cuda" and not torch_cuda_available():
+                raise RuntimeError(
+                    "CUDA device requested but torch.cuda.is_available() is False. "
+                    "Switch device to `cpu` or install a compatible CUDA runtime."
+                )
+            module = self._import_whisper()
+            self._model = module.load_model(
                 self._config.model_name,
                 device=self._config.device,
-                compute_type=self._config.compute_type,
             )
         return self._model
 
     @staticmethod
-    def _import_faster_whisper():
+    def _import_whisper():
         try:
-            return import_module("faster_whisper")
+            return import_module("whisper")
         except ImportError as exc:
             raise RuntimeError(
-                "faster-whisper is not installed. Run `uv sync` before using the real Whisper backend."
+                "openai-whisper is not installed. Run `uv sync` before using the real Whisper backend."
             ) from exc
 
 
@@ -228,8 +290,54 @@ def _seconds_to_ms(value: float | None) -> float | None:
     return value * 1000
 
 
-def _compute_confidence(words: list[TranscribedWord], info: object) -> float | None:
+def _samples_to_numpy(samples: tuple[float, ...]):
+    numpy = import_module("numpy")
+    return numpy.asarray(samples, dtype=numpy.float32)
+
+
+def _normalize_model_name(model_name: str) -> str:
+    normalized = model_name.strip()
+    legacy_prefix = "whisper-"
+    if normalized.startswith(legacy_prefix):
+        return normalized[len(legacy_prefix) :]
+    return normalized
+
+
+def is_cuda_runtime_error(error: BaseException) -> bool:
+    message = str(error).lower()
+    return any(marker in message for marker in CUDA_RUNTIME_ERROR_MARKERS)
+
+
+def torch_cuda_available() -> bool:
+    try:
+        torch = import_module("torch")
+    except ImportError:
+        return False
+    return bool(torch.cuda.is_available())
+
+
+def is_missing_ffmpeg_error(error: BaseException) -> bool:
+    message = str(error).lower()
+    return any(marker in message for marker in FFMPEG_ERROR_MARKERS)
+
+
+def _compute_confidence(words: list[TranscribedWord], segments: list[dict]) -> float | None:
     probabilities = [word.probability for word in words if word.probability is not None]
     if probabilities:
         return round(sum(probabilities) / len(probabilities), 4)
-    return getattr(info, "language_probability", None)
+
+    segment_probabilities = [
+        _avg_logprob_to_probability(segment.get("avg_logprob"))
+        for segment in segments
+        if segment.get("avg_logprob") is not None
+    ]
+    segment_probabilities = [value for value in segment_probabilities if value is not None]
+    if segment_probabilities:
+        return round(sum(segment_probabilities) / len(segment_probabilities), 4)
+    return None
+
+
+def _avg_logprob_to_probability(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return max(0.0, min(1.0, exp(value)))

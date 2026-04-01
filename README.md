@@ -37,6 +37,18 @@ uv run python -m pytest
 uv run streamlit run experimentations/streamlit_whisper_app.py
 ```
 
+### Tester la transcription micro en temps reel
+
+```bash
+uv run python experimentations/live_whisper_cli.py
+```
+
+Options utiles :
+- lister les micros disponibles : `uv run python experimentations/live_whisper_cli.py --list-devices`
+- forcer le CPU : `uv run python experimentations/live_whisper_cli.py --device cpu`
+- utiliser un modele plus leger : `uv run python experimentations/live_whisper_cli.py --model turbo`
+- choisir un micro : `uv run python experimentations/live_whisper_cli.py --input-device "Nom du micro"`
+
 Ensuite :
 - autoriser l'acces au microphone dans le navigateur
 - enregistrer une phrase avec le bouton de capture
@@ -44,6 +56,11 @@ Ensuite :
 - lire la transcription mot par mot puis la transcription complete
 
 Notes :
-- au premier lancement, `faster-whisper` peut telecharger le modele choisi
-- le mode `cpu` est le plus simple pour demarrer
-- les modeles `tiny`, `base` ou `small` sont de bons points de depart pour les essais rapides
+- le depot est maintenant configure par defaut pour `Whisper large-v3`
+- au premier lancement, `openai-whisper` peut telecharger le modele choisi
+- `large-v3` sur `cpu` fonctionne, mais le chargement initial et l'inference peuvent etre lents
+- la capture micro temps reel utilise `sounddevice`
+- `ffmpeg` reste necessaire pour les transcriptions depuis un fichier audio, mais le flux micro capture en memoire n'en depend pas
+- le mode `cuda` avec `fp16` est recommande si une GPU compatible est disponible
+- les modeles `tiny`, `base` ou `small` restent utiles pour des essais rapides
+- le projet pinne maintenant `torch` sur l'index PyTorch `cu128` pour eviter qu'un `uv sync` reinstalle un build CPU-only
