@@ -93,17 +93,28 @@ def build_default_scope() -> ProjectScope:
                     WorkItem(
                         title="Modeliser le graphe memoire",
                         objective="Definir les entites, relations et attributs affectifs du domaine.",
-                        deliverable="Un schema initial pour Neo4j avec exemples de noeuds et relations.",
+                        deliverable=(
+                            "Un schema initial exportable vers Neo4j avec exemples de noeuds et relations."
+                        ),
+                        completed=True,
                     ),
                     WorkItem(
                         title="Mettre en place l'indexation semantique",
                         objective="Permettre la recherche contextuelle dans les souvenirs et habitudes.",
-                        deliverable="Une couche LlamaIndex connectee a ChromaDB pour l'ingestion et la recherche.",
+                        deliverable=(
+                            "Une couche semantique locale compatible avec un usage type "
+                            "LlamaIndex et ChromaDB pour l'ingestion et la recherche."
+                        ),
+                        completed=True,
                     ),
                     WorkItem(
                         title="Concevoir la strategie de synchronisation",
                         objective="Faire coexister recherche vectorielle et graphe de connaissances.",
-                        deliverable="Des regles d'ecriture/lecture entre ChromaDB et Neo4j avec tests d'integration.",
+                        deliverable=(
+                            "Des regles d'ecriture/lecture entre graphe memoire et index "
+                            "vectoriel local avec tests automatises."
+                        ),
+                        completed=True,
                     ),
                 ),
             ),

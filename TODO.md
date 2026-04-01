@@ -21,15 +21,15 @@ Stabiliser l'entree micro et l'activation vocale pour obtenir des interactions f
 ### 2. Memoire et contexte
 Representer la memoire personnelle du patient et relier les evenements, personnes, lieux et emotions.
 
-- [ ] Modeliser le graphe memoire
+- [x] Modeliser le graphe memoire
   Objectif : definir les entites, relations et attributs affectifs du domaine.
-  Livrable : un schema initial pour Neo4j avec exemples de noeuds et relations.
-- [ ] Mettre en place l'indexation semantique
+  Livrable : un schema initial exportable vers Neo4j avec exemples de noeuds et relations.
+- [x] Mettre en place l'indexation semantique
   Objectif : permettre la recherche contextuelle dans les souvenirs et habitudes.
-  Livrable : une couche LlamaIndex connectee a ChromaDB pour l'ingestion et la recherche.
-- [ ] Concevoir la strategie de synchronisation
+  Livrable : une couche semantique locale compatible avec un usage type LlamaIndex et ChromaDB pour l'ingestion et la recherche.
+- [x] Concevoir la strategie de synchronisation
   Objectif : faire coexister recherche vectorielle et graphe de connaissances.
-  Livrable : des regles d'ecriture/lecture entre ChromaDB et Neo4j avec tests d'integration.
+  Livrable : des regles d'ecriture/lecture entre graphe memoire et index vectoriel local avec tests automatises.
 
 ### 3. Raisonnement conversationnel
 Produire des reponses utiles, apaisantes et contextualisees a partir de la memoire du patient.
