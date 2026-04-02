@@ -52,3 +52,41 @@ Notes :
 - le mode `cuda` avec `fp16` est recommande si une GPU compatible est disponible
 - les modeles `tiny`, `base` ou `small` restent utiles pour des essais rapides
 - le projet pinne maintenant `torch` sur l'index PyTorch `cu128` pour eviter qu'un `uv sync` reinstalle un build CPU-only
+
+### Utiliser la restitution vocale
+
+Configurer d'abord une cle API Mistral :
+
+```bash
+export MISTRAL_API_KEY="..."
+```
+
+Exemple minimal :
+
+```python
+from memento import (
+    SoundDeviceOutput,
+    SpeakerPlayer,
+    SpeechSynthesizer,
+    TextToSpeechConfig,
+    VoiceResponsePipeline,
+    VoxtralTTSBackend,
+)
+
+tts_config = TextToSpeechConfig(
+    model_name="voxtral-tts-2603",
+    voice_id="calm-french-voice",
+    response_format="wav",
+)
+
+pipeline = VoiceResponsePipeline(
+    synthesizer=SpeechSynthesizer(
+        backend=VoxtralTTSBackend(config=tts_config),
+        config=tts_config,
+    ),
+    player=SpeakerPlayer(device=SoundDeviceOutput()),
+)
+
+result = pipeline.speak("Bonjour Charles, je suis la pour t'aider.")
+print(result.metrics.end_to_end_latency_ms, result.meets_targets)
+```

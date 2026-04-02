@@ -141,4 +141,3 @@ def _import_sounddevice():
         raise RuntimeError(
             "`sounddevice` is not installed. Run `uv sync` before using the live microphone tool."
         ) from exc
-
