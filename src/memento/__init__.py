@@ -1,5 +1,7 @@
 """Memento package."""
 
+from importlib import import_module
+
 from .audio import (
     AudioFrame,
     AudioOutputDevice,
@@ -50,7 +52,6 @@ from .audio import (
 )
 from .memory import (
     AffectiveState,
-    ChromaSemanticIndex,
     GraphStore,
     InMemoryChromaCollection,
     InMemoryGraphStore,
@@ -65,7 +66,6 @@ from .memory import (
     MemoryRelation,
     MemorySyncEngine,
     MemorySyncReport,
-    Neo4jGraphStore,
     PatientMemorySnapshot,
     PatientProfile,
     PersonProfile,
@@ -155,3 +155,13 @@ __all__ = [
     "speech_segment_from_wav_bytes",
     "write_wav_file",
 ]
+
+
+def __getattr__(name: str):
+    if name not in {"ChromaSemanticIndex", "Neo4jGraphStore"}:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module = import_module(".memory", __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value

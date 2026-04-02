@@ -19,15 +19,19 @@ from .semantic import MemoryDocument, SemanticSearchHit
 
 try:
     from neo4j import GraphDatabase
-except ImportError:  # pragma: no cover - optional dependency
+    _NEO4J_IMPORT_ERROR = None
+except Exception as exc:  # pragma: no cover - optional dependency
     GraphDatabase = None
+    _NEO4J_IMPORT_ERROR = exc
 
 try:
     import chromadb
     from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-except ImportError:  # pragma: no cover - optional dependency
+    _CHROMA_IMPORT_ERROR = None
+except Exception as exc:  # pragma: no cover - optional dependency
     chromadb = None
     SentenceTransformerEmbeddingFunction = None
+    _CHROMA_IMPORT_ERROR = exc
 
 
 class Neo4jGraphStore:
@@ -46,7 +50,8 @@ class Neo4jGraphStore:
     ) -> None:
         if driver is None and GraphDatabase is None:
             raise RuntimeError(
-                "Neo4j support is not installed. Install the optional 'memory-backends' dependencies."
+                "Neo4j support is not available. Install the optional 'memory-backends' dependencies "
+                f"or fix the Neo4j environment. Original import error: {_NEO4J_IMPORT_ERROR!r}"
             )
 
         self._database = database
@@ -163,12 +168,14 @@ class ChromaSemanticIndex:
     ) -> None:
         if client is None and chromadb is None:
             raise RuntimeError(
-                "ChromaDB support is not installed. Install the optional 'memory-backends' dependencies."
+                "ChromaDB support is not available. Install the optional 'memory-backends' dependencies "
+                f"or fix the ChromaDB environment. Original import error: {_CHROMA_IMPORT_ERROR!r}"
             )
         if embedding_function is None and SentenceTransformerEmbeddingFunction is None:
             raise RuntimeError(
-                "ChromaDB embedding support is not installed. Install the optional 'memory-backends' dependencies "
-                "or provide a custom embedding_function."
+                "ChromaDB embedding support is not available. Install the optional 'memory-backends' "
+                "dependencies, provide a custom embedding_function, or fix the ChromaDB environment. "
+                f"Original import error: {_CHROMA_IMPORT_ERROR!r}"
             )
 
         self._client = client or _build_chroma_client(
