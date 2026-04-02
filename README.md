@@ -13,7 +13,7 @@ Micro → Whisper + VAD
               ↓
     Ministral 3 8B
               ↓
-         Voxtral TTS
+         Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
               ↓
            Haut-parleur
 
@@ -53,35 +53,58 @@ Notes :
 - les modeles `tiny`, `base` ou `small` restent utiles pour des essais rapides
 - le projet pinne maintenant `torch` sur l'index PyTorch `cu128` pour eviter qu'un `uv sync` reinstalle un build CPU-only
 
-### Utiliser la restitution vocale
+### Tester le TTS avec Streamlit
 
-Configurer d'abord une cle API Mistral :
+Installer d'abord le runtime local recommande pour `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` :
 
 ```bash
-export MISTRAL_API_KEY="..."
+uv pip install -U qwen-tts
 ```
+
+Ensuite lancer le labo TTS :
+
+```bash
+uv run streamlit run experimentations/streamlit_tts_app.py
+```
+
+Notes :
+- la doc officielle Qwen recommande le package Python `qwen-tts`
+- le modele `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` se charge localement via `Qwen3TTSModel.from_pretrained(...)`
+- `Synthese seulement` genere un preview audio dans le navigateur
+- `Synthese + server speaker` joue sur les haut-parleurs de la machine qui execute Streamlit
+- le front expose `speaker`, `langue` et `instruction` pour le mode `CustomVoice`
+- le chemin `wav` reste le plus simple pour les essais locaux
+
+### Utiliser la restitution vocale
+
+Verifier d'abord que `qwen-tts` et ses dependances runtime sont installes.
 
 Exemple minimal :
 
 ```python
 from memento import (
+    DEFAULT_QWEN_TTS_LANGUAGE,
+    DEFAULT_QWEN_TTS_MODEL_NAME,
+    DEFAULT_QWEN_TTS_SPEAKER,
+    QwenTTSBackend,
     SoundDeviceOutput,
     SpeakerPlayer,
     SpeechSynthesizer,
     TextToSpeechConfig,
     VoiceResponsePipeline,
-    VoxtralTTSBackend,
 )
 
 tts_config = TextToSpeechConfig(
-    model_name="voxtral-tts-2603",
-    voice_id="calm-french-voice",
+    model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+    voice_id=DEFAULT_QWEN_TTS_SPEAKER,
+    language=DEFAULT_QWEN_TTS_LANGUAGE,
     response_format="wav",
+    instruction="Parle calmement et rassure la personne.",
 )
 
 pipeline = VoiceResponsePipeline(
     synthesizer=SpeechSynthesizer(
-        backend=VoxtralTTSBackend(config=tts_config),
+        backend=QwenTTSBackend(config=tts_config),
         config=tts_config,
     ),
     player=SpeakerPlayer(device=SoundDeviceOutput()),

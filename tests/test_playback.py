@@ -88,7 +88,7 @@ def test_speaker_player_interrupts_previous_playback_and_dispatches_audio() -> N
         sample_rate_hz=None,
         channels=1,
         latency_ms=42.0,
-        model_name="voxtral-tts-2603",
+        model_name="Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
         voice_id=None,
         character_count=7,
     )
@@ -118,7 +118,7 @@ def test_speaker_player_does_not_claim_an_interruption_without_device_confirmati
         sample_rate_hz=None,
         channels=1,
         latency_ms=42.0,
-        model_name="voxtral-tts-2603",
+        model_name="Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
         voice_id=None,
         character_count=7,
     )
@@ -142,7 +142,7 @@ def test_blocking_playback_tracks_completion_latency_without_overloading_dispatc
         sample_rate_hz=None,
         channels=1,
         latency_ms=42.0,
-        model_name="voxtral-tts-2603",
+        model_name="Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
         voice_id=None,
         character_count=7,
     )

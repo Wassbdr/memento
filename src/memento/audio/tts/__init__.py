@@ -10,14 +10,16 @@ from .playback import (
     decode_audio_bytes,
 )
 from .synthesis import (
-    DEFAULT_VOXTRAL_MODEL_NAME,
+    DEFAULT_QWEN_TTS_LANGUAGE,
+    DEFAULT_QWEN_TTS_MODEL_NAME,
+    DEFAULT_QWEN_TTS_SPEAKER,
+    QwenTTSBackend,
     SUPPORTED_TTS_RESPONSE_FORMATS,
     SpeechSynthesizer,
     SynthesizedSpeech,
     TextToSpeechBackend,
     TextToSpeechBackendResult,
     TextToSpeechConfig,
-    VoxtralTTSBackend,
 )
 from .voice import (
     VoiceExperienceMetrics,
@@ -28,9 +30,12 @@ from .voice import (
 
 __all__ = [
     "AudioOutputDevice",
-    "DEFAULT_VOXTRAL_MODEL_NAME",
+    "DEFAULT_QWEN_TTS_LANGUAGE",
+    "DEFAULT_QWEN_TTS_MODEL_NAME",
+    "DEFAULT_QWEN_TTS_SPEAKER",
     "DecodedAudio",
     "PlaybackResult",
+    "QwenTTSBackend",
     "SoundDeviceOutput",
     "SpeakerConfig",
     "SpeakerPlayer",
@@ -44,6 +49,5 @@ __all__ = [
     "VoiceExperienceTargets",
     "VoiceResponsePipeline",
     "VoiceResponseResult",
-    "VoxtralTTSBackend",
     "decode_audio_bytes",
 ]

@@ -5,12 +5,13 @@ description = "Prototype d'assistant vocal memoire pour patients atteints de la 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "mistralai>=2.0.0",
     "openai-whisper>=20250625",
     "pillow<12",
+    "qwen-tts",
     "sounddevice>=0.5.2",
     "streamlit>=1.55.0",
     "torch==2.11.0",
+    "torchaudio==2.11.0",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +30,7 @@ dev = [
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
 
 [[tool.uv.index]]
 name = "pytorch-cu128"

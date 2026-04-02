@@ -269,14 +269,14 @@ Fournit l'adaptateur texte-vers-voix.
 
 Objets principaux:
 
-- `TextToSpeechConfig`: configuration Voxtral et format de sortie
+- `TextToSpeechConfig`: configuration Qwen et format de sortie
 - `TextToSpeechBackend`: protocole backend
 - `TextToSpeechBackendResult`: reponse normalisee du backend
 - `SpeechSynthesizer`: facade projet qui mesure la latence de synthese
-- `VoxtralTTSBackend`: implementation Mistral/Voxtral avec import paresseux de `mistralai`
+- `QwenTTSBackend`: implementation locale via le package `qwen-tts`
 - `SynthesizedSpeech`: resultat final exploitable par la couche playback
 
-Le backend attend une cle Mistral via `MISTRAL_API_KEY` par defaut.
+Le backend charge localement `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` par defaut.
 
 ### 8. `tts/playback.py`
 
@@ -291,7 +291,7 @@ Objets principaux:
 - `SoundDeviceOutput`: implementation basee sur `sounddevice`
 - `PlaybackResult`: metriques de diffusion
 
-Le decodeur supporte actuellement les formats `wav` et `pcm`. Le choix par defaut pour Voxtral est donc `wav`, plus simple a relire localement.
+Le decodeur supporte actuellement les formats `wav` et `pcm`. Le choix par defaut pour Qwen est donc `wav`, plus simple a relire localement.
 
 ### 9. `tts/voice.py`
 
@@ -308,22 +308,27 @@ Exemple minimal:
 
 ```python
 from memento.audio import (
+    DEFAULT_QWEN_TTS_LANGUAGE,
+    DEFAULT_QWEN_TTS_MODEL_NAME,
+    DEFAULT_QWEN_TTS_SPEAKER,
+    QwenTTSBackend,
     SoundDeviceOutput,
     SpeakerPlayer,
     SpeechSynthesizer,
     TextToSpeechConfig,
     VoiceResponsePipeline,
-    VoxtralTTSBackend,
 )
 
 tts_config = TextToSpeechConfig(
-    model_name="voxtral-tts-2603",
+    model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+    voice_id=DEFAULT_QWEN_TTS_SPEAKER,
+    language=DEFAULT_QWEN_TTS_LANGUAGE,
     response_format="wav",
 )
 
 pipeline = VoiceResponsePipeline(
     synthesizer=SpeechSynthesizer(
-        backend=VoxtralTTSBackend(config=tts_config),
+        backend=QwenTTSBackend(config=tts_config),
         config=tts_config,
     ),
     player=SpeakerPlayer(device=SoundDeviceOutput()),
@@ -335,7 +340,7 @@ print(result.metrics.end_to_end_latency_ms, result.meets_targets)
 
 ## Limites actuelles
 
-- le backend Voxtral suppose la disponibilite du SDK `mistralai`
+- le backend Qwen suppose la disponibilite du package `qwen-tts`
 - la lecture locale decode uniquement `wav` et `pcm`
 - aucun test d'integration reseau n'est execute dans la suite unitaire
 
@@ -353,6 +358,6 @@ print(result.metrics.end_to_end_latency_ms, result.meets_targets)
 - tu changes `stt/vad.py` si la segmentation parole/silence change
 - tu changes `stt/io.py` si de nouveaux formats ou conversions sont ajoutes
 - tu changes `stt/transcription.py` si le backend Whisper ou le pipeline de transcription evoluent
-- tu changes `tts/synthesis.py` si l'integration Voxtral ou l'API TTS evoluent
+- tu changes `tts/synthesis.py` si l'integration Qwen ou l'API TTS evoluent
 - tu changes `tts/playback.py` si la diffusion haut-parleur ou le decodage audio evoluent
 - tu changes `tts/voice.py` si les seuils et metriques de restitution changent

@@ -47,7 +47,7 @@ Produire des reponses utiles, apaisantes et contextualisees a partir de la memoi
 ### 4. Restitution vocale
 Transformer les reponses texte en experience vocale fluide, claire et rassurante.
 
-- [x] Connecter Voxtral TTS
+- [x] Connecter Qwen3-TTS
   Objectif : generer une voix naturelle et intelligible.
   Livrable : un adaptateur TTS configurable avec choix de voix et parametres de synthese.
 - [x] Diffuser la reponse sur haut-parleur

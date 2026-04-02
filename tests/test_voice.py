@@ -72,7 +72,7 @@ def test_voice_response_pipeline_aggregates_metrics(monkeypatch) -> None:
             sample_rate_hz=None,
             channels=1,
             latency_ms=120.0,
-            model_name="voxtral-tts-2603",
+            model_name="Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
             voice_id=None,
             character_count=7,
         )
@@ -132,7 +132,7 @@ def test_voice_response_pipeline_skips_dispatch_targets_when_playback_is_blockin
             sample_rate_hz=None,
             channels=1,
             latency_ms=120.0,
-            model_name="voxtral-tts-2603",
+            model_name="Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
             voice_id=None,
             character_count=7,
         )

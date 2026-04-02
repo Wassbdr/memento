@@ -3,11 +3,13 @@ import sys
 from pathlib import Path
 
 from memento.audio import (
-    DEFAULT_VOXTRAL_MODEL_NAME,
+    DEFAULT_QWEN_TTS_LANGUAGE,
+    DEFAULT_QWEN_TTS_MODEL_NAME,
+    DEFAULT_QWEN_TTS_SPEAKER,
+    QwenTTSBackend,
     SpeechSynthesizer,
     TextToSpeechBackendResult,
     TextToSpeechConfig,
-    VoxtralTTSBackend,
 )
 
 
@@ -39,10 +41,12 @@ class FakeTTSBackend:
         )
 
 
-def test_text_to_speech_config_defaults_to_latest_voxtral_model() -> None:
+def test_text_to_speech_config_defaults_to_qwen_custom_voice_model() -> None:
     config = TextToSpeechConfig()
 
-    assert config.model_name == DEFAULT_VOXTRAL_MODEL_NAME
+    assert config.model_name == DEFAULT_QWEN_TTS_MODEL_NAME
+    assert config.voice_id == DEFAULT_QWEN_TTS_SPEAKER
+    assert config.language == DEFAULT_QWEN_TTS_LANGUAGE
 
 
 def test_text_to_speech_config_rejects_formats_without_local_playback_support() -> None:
@@ -59,8 +63,8 @@ def test_speech_synthesizer_calls_backend_and_encodes_reference_audio(tmp_path: 
     synthesizer = SpeechSynthesizer(
         backend=backend,
         config=TextToSpeechConfig(
-            model_name="voxtral-tts-2603",
-            voice_id="voice-preset",
+            model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+            voice_id="Vivian",
             response_format="wav",
         ),
     )
@@ -70,8 +74,8 @@ def test_speech_synthesizer_calls_backend_and_encodes_reference_audio(tmp_path: 
     result = synthesizer.synthesize("Bonjour maman", reference_audio=reference_path)
 
     assert result.text == "Bonjour maman"
-    assert result.model_name == "voxtral-tts-2603"
-    assert result.voice_id == "voice-preset"
+    assert result.model_name == DEFAULT_QWEN_TTS_MODEL_NAME
+    assert result.voice_id == "Vivian"
     assert result.response_format == "wav"
     assert result.sample_rate_hz == 24_000
     assert result.character_count == len("Bonjour maman")
@@ -97,53 +101,92 @@ def test_speech_synthesizer_requires_sample_rate_for_pcm() -> None:
         raise AssertionError("Expected ValueError when PCM sample rate is missing")
 
 
-def test_voxtral_backend_wraps_mistral_audio_speech(monkeypatch) -> None:
-    class FakeSpeechClient:
+def test_qwen_backend_uses_generate_custom_voice(monkeypatch) -> None:
+    class FakeGeneratedAudio:
+        def tolist(self):
+            return [0.0, 0.25, -0.25]
+
+    class FakeQwenModel:
+        last_from_pretrained: dict[str, object] | None = None
         calls: list[dict[str, object]] = []
 
-        def complete(self, **kwargs):
+        @classmethod
+        def from_pretrained(cls, model_name: str, **kwargs):
+            cls.last_from_pretrained = {"model_name": model_name, **kwargs}
+            return cls()
+
+        def generate_custom_voice(self, **kwargs):
             type(self).calls.append(kwargs)
-            return {
-                "audio_data": base64.b64encode(b"voice-bytes").decode("ascii"),
-                "sample_rate_hz": 24_000,
-                "channels": 1,
-            }
+            return [FakeGeneratedAudio()], 24_000
 
-    class FakeAudioClient:
-        speech = FakeSpeechClient()
+    class FakeQwenModule:
+        Qwen3TTSModel = FakeQwenModel
 
-    class FakeMistral:
-        last_api_key: str | None = None
+    class FakeTorchModule:
+        bfloat16 = "bf16-token"
 
-        def __init__(self, api_key: str) -> None:
-            type(self).last_api_key = api_key
-            self.audio = FakeAudioClient()
+    monkeypatch.setitem(sys.modules, "qwen_tts", FakeQwenModule)
+    monkeypatch.setitem(sys.modules, "torch", FakeTorchModule)
 
-    class FakeMistralModule:
-        Mistral = FakeMistral
-
-    monkeypatch.setitem(sys.modules, "mistralai.client", FakeMistralModule)
-
-    backend = VoxtralTTSBackend(
+    backend = QwenTTSBackend(
         TextToSpeechConfig(
-            model_name="voxtral-tts-2603",
+            model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+            voice_id="Vivian",
             response_format="wav",
-            api_key="secret",
+            language="French",
+            instruction="Parle calmement.",
+            device_map="cuda:0",
+            dtype="bfloat16",
+            attn_implementation="flash_attention_2",
         )
     )
 
     result = backend.synthesize(
         text="Bonjour",
-        model_name="voxtral-tts-2603",
-        voice_id="voice-id",
+        model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+        voice_id="Vivian",
         response_format="wav",
-        reference_audio_base64=base64.b64encode(b"ref").decode("ascii"),
+        reference_audio_base64=base64.b64encode(b"ignored").decode("ascii"),
     )
 
-    assert FakeMistral.last_api_key == "secret"
-    assert FakeSpeechClient.calls[0]["model"] == "voxtral-tts-2603"
-    assert FakeSpeechClient.calls[0]["input"] == "Bonjour"
-    assert FakeSpeechClient.calls[0]["voice_id"] == "voice-id"
-    assert FakeSpeechClient.calls[0]["ref_audio"] == base64.b64encode(b"ref").decode("ascii")
-    assert result.audio_bytes == b"voice-bytes"
+    assert FakeQwenModel.last_from_pretrained == {
+        "model_name": DEFAULT_QWEN_TTS_MODEL_NAME,
+        "device_map": "cuda:0",
+        "dtype": "bf16-token",
+        "attn_implementation": "flash_attention_2",
+    }
+    assert FakeQwenModel.calls[0] == {
+        "text": "Bonjour",
+        "language": "French",
+        "speaker": "Vivian",
+        "instruct": "Parle calmement.",
+    }
+    assert result.response_format == "wav"
     assert result.sample_rate_hz == 24_000
+    assert result.channels == 1
+    assert result.audio_bytes[:4] == b"RIFF"
+
+
+def test_qwen_backend_rejects_non_wav_output(monkeypatch) -> None:
+    class FakeQwenModule:
+        class Qwen3TTSModel:
+            @classmethod
+            def from_pretrained(cls, *args, **kwargs):
+                return cls()
+
+    monkeypatch.setitem(sys.modules, "qwen_tts", FakeQwenModule)
+
+    backend = QwenTTSBackend(TextToSpeechConfig(response_format="wav"))
+
+    try:
+        backend.synthesize(
+            text="Bonjour",
+            model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+            voice_id="Vivian",
+            response_format="pcm",
+            reference_audio_base64=None,
+        )
+    except ValueError as exc:
+        assert "only `wav`" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError when Qwen backend is asked for PCM output")
