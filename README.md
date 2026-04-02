@@ -55,6 +55,71 @@ Chemin lecture:
 -> contexte de reorientation
 -> generation de reponse vocale
 
+## Orchestration conversationnelle
+
+La couche conversationnelle relie la memoire au modele de generation.
+
+Boucle executee:
+
+`question patient`
+-> `MemorySyncEngine.reorientation_context(...)`
+-> injection du contexte patient dans le prompt
+-> generation du texte assistant
+-> trace des souvenirs utilises
+
+Le contexte injecte contient notamment:
+
+- l'identite du patient
+- les reperes rassurants (`anchors`)
+- les notes de soin (`care_notes`)
+- les proches de confiance
+- les routines immediates
+- les souvenirs recuperes et leurs signaux de ranking
+
+L'orchestrateur actuel utilise `ConversationOrchestrator.respond(...)` pour:
+
+- recuperer le `PatientReorientationContext`
+- construire un prompt utilisateur avec ce contexte memoire
+- appeler un backend de generation
+- retourner la reponse, le contexte et la trace de retrieval
+
+Exemple minimal:
+
+```python
+from memento import (
+    ConversationGeneration,
+    ConversationMessage,
+    ConversationOrchestrator,
+    MemorySyncEngine,
+)
+
+
+class FakeConversationBackend:
+    def generate(self, messages, *, model_name, temperature):
+        return ConversationGeneration(
+            text="Claire vient dimanche pour le dejeuner.",
+            model_name=model_name,
+        )
+
+
+engine = MemorySyncEngine()
+engine.sync_snapshot(snapshot)
+
+orchestrator = ConversationOrchestrator(
+    memory_engine=engine,
+    backend=FakeConversationBackend(),
+)
+
+response = orchestrator.respond(
+    "rose",
+    "Qui vient dimanche ?",
+)
+
+print(response.answer)
+print(response.context.patient_display_name)
+print(response.trace.retrieved_memories)
+```
+
 ## Comment tester
 
 ### Installer l'environnement
