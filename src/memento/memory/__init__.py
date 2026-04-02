@@ -11,6 +11,8 @@ from .graph import (
     build_memory_graph,
     default_memory_schema,
 )
+from .integrations import ChromaSemanticIndex, Neo4jGraphStore
+from .interfaces import GraphStore, SemanticIndex
 from .models import (
     AffectiveState,
     MemoryEpisode,
@@ -34,7 +36,9 @@ from .sync import InMemoryGraphStore, MemoryContextHit, MemoryRecall, MemorySync
 
 __all__ = [
     "AffectiveState",
+    "ChromaSemanticIndex",
     "GraphNeighbor",
+    "GraphStore",
     "InMemoryChromaCollection",
     "InMemoryGraphStore",
     "LlamaIndexSemanticIndex",
@@ -49,6 +53,7 @@ __all__ = [
     "MemorySyncEngine",
     "MemorySyncReport",
     "NodeSchema",
+    "Neo4jGraphStore",
     "PatientMemorySnapshot",
     "PatientProfile",
     "PersonProfile",
@@ -57,6 +62,7 @@ __all__ = [
     "RelationSchema",
     "RoutineProfile",
     "SemanticMemoryIndex",
+    "SemanticIndex",
     "SemanticSearchHit",
     "TextEmbedder",
     "TokenTextEmbedder",

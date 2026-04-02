@@ -9,6 +9,15 @@ from typing import Protocol
 
 from .models import PatientMemorySnapshot
 
+try:
+    from llama_index.core import VectorStoreIndex
+    from llama_index.core.schema import Document as LlamaIndexDocument
+    from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+except ImportError:  # pragma: no cover - optional dependency
+    HuggingFaceEmbedding = None
+    LlamaIndexDocument = None
+    VectorStoreIndex = None
+
 
 @dataclass(frozen=True)
 class MemoryDocument:
@@ -28,6 +37,20 @@ class MemoryDocument:
             "text": self.text,
             "metadata": dict(self.metadata),
         }
+
+    def to_llamaindex_document(self) -> object:
+        """Build a real LlamaIndex document when the optional dependency is installed."""
+
+        if LlamaIndexDocument is None:
+            raise RuntimeError(
+                "LlamaIndex support is not installed. Install the optional 'memory-backends' dependencies."
+            )
+
+        metadata = dict(self.metadata)
+        metadata["document_id"] = self.document_id
+        metadata["source_node_id"] = self.source_node_id
+        metadata["source_label"] = self.source_label
+        return LlamaIndexDocument(text=self.text, doc_id=self.document_id, metadata=metadata)
 
 
 @dataclass(frozen=True)
@@ -118,6 +141,19 @@ class InMemoryChromaCollection:
 
     def count(self) -> int:
         return len(self._documents)
+
+    def list_documents(
+        self,
+        *,
+        metadata_filters: dict[str, object] | None = None,
+    ) -> tuple[MemoryDocument, ...]:
+        documents = []
+        for document in self._documents.values():
+            if metadata_filters is not None:
+                if any(document.metadata.get(key) != value for key, value in metadata_filters.items()):
+                    continue
+            documents.append(document)
+        return tuple(sorted(documents, key=lambda item: item.document_id))
 
 
 class MemoryDocumentProjector:
@@ -255,6 +291,29 @@ class SemanticMemoryIndex:
     def delete(self, document_ids: tuple[str, ...]) -> None:
         self._collection.delete_documents(document_ids)
 
+    def replace_documents(self, patient_id: str, documents: tuple[MemoryDocument, ...]) -> int:
+        previous_documents = self._collection.list_documents(metadata_filters={"patient_id": patient_id})
+        previous_ids = {document.document_id for document in previous_documents}
+        current_ids = {document.document_id for document in documents}
+        stale_ids = tuple(sorted(previous_ids - current_ids))
+        touched_ids = tuple(sorted(previous_ids | current_ids))
+
+        try:
+            if stale_ids:
+                self.delete(stale_ids)
+            self.ingest(documents)
+        except Exception:
+            if touched_ids:
+                self.delete(touched_ids)
+            if previous_documents:
+                self.ingest(previous_documents)
+            raise
+
+        return len(stale_ids)
+
+    def close(self) -> None:
+        """Release resources held by the in-memory semantic index."""
+
     def search(
         self,
         query: str,
@@ -273,8 +332,140 @@ class SemanticMemoryIndex:
 
 
 class LlamaIndexSemanticIndex(SemanticMemoryIndex):
-    """Small orchestration wrapper named after the intended production retrieval layer."""
+    """Semantic index that can optionally use the real LlamaIndex stack."""
 
+    def __init__(
+        self,
+        collection: InMemoryChromaCollection | None = None,
+        embedder: TextEmbedder | None = None,
+        *,
+        use_llama_index: bool = False,
+        llama_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+        llama_embed_model: object | None = None,
+    ) -> None:
+        self._use_llama_index = use_llama_index
+        if not use_llama_index:
+            super().__init__(collection=collection, embedder=embedder)
+            return
+
+        if VectorStoreIndex is None or HuggingFaceEmbedding is None:
+            raise RuntimeError(
+                "LlamaIndex support is not installed. Install the optional 'memory-backends' dependencies."
+            )
+
+        self._documents: dict[str, MemoryDocument] = {}
+        self._llama_index: object | None = None
+        self._llama_embed_model = llama_embed_model or HuggingFaceEmbedding(model_name=llama_embedding_model)
+
+    def ingest(self, documents: tuple[MemoryDocument, ...]) -> None:
+        if not self._use_llama_index:
+            super().ingest(documents)
+            return
+
+        for document in documents:
+            self._documents[document.document_id] = document
+        self._rebuild_llama_index()
+
+    def delete(self, document_ids: tuple[str, ...]) -> None:
+        if not self._use_llama_index:
+            super().delete(document_ids)
+            return
+
+        for document_id in document_ids:
+            self._documents.pop(document_id, None)
+        self._rebuild_llama_index()
+
+    def replace_documents(self, patient_id: str, documents: tuple[MemoryDocument, ...]) -> int:
+        if not self._use_llama_index:
+            return super().replace_documents(patient_id, documents)
+
+        previous_documents = tuple(
+            document
+            for document in self._documents.values()
+            if document.metadata.get("patient_id") == patient_id
+        )
+        previous_state = dict(self._documents)
+        previous_ids = {document.document_id for document in previous_documents}
+        current_ids = {document.document_id for document in documents}
+
+        try:
+            for document_id in previous_ids:
+                self._documents.pop(document_id, None)
+            for document in documents:
+                self._documents[document.document_id] = document
+            self._rebuild_llama_index()
+        except Exception:
+            self._documents = previous_state
+            self._rebuild_llama_index()
+            raise
+
+        return len(previous_ids - current_ids)
+
+    def search(
+        self,
+        query: str,
+        *,
+        top_k: int = 3,
+        patient_id: str | None = None,
+        source_labels: tuple[str, ...] | None = None,
+    ) -> tuple[SemanticSearchHit, ...]:
+        if not self._use_llama_index:
+            return super().search(
+                query,
+                top_k=top_k,
+                patient_id=patient_id,
+                source_labels=source_labels,
+            )
+
+        if top_k <= 0:
+            raise ValueError("top_k must be positive")
+        if not self._documents or self._llama_index is None:
+            return ()
+
+        retriever = self._llama_index.as_retriever(
+            similarity_top_k=max(top_k, len(self._documents)),
+        )
+        raw_hits = retriever.retrieve(query)
+
+        hits: list[SemanticSearchHit] = []
+        seen_document_ids: set[str] = set()
+        for hit in raw_hits:
+            metadata = dict(getattr(hit.node, "metadata", {}) or {})
+            document_id = str(metadata.get("document_id") or getattr(hit.node, "ref_doc_id", ""))
+            if not document_id or document_id in seen_document_ids:
+                continue
+
+            document = self._documents.get(document_id)
+            if document is None:
+                continue
+            if patient_id is not None and document.metadata.get("patient_id") != patient_id:
+                continue
+            if source_labels and document.source_label not in source_labels:
+                continue
+
+            score = round(float(hit.score or 0.0), 4)
+            hits.append(SemanticSearchHit(document=document, score=score))
+            seen_document_ids.add(document_id)
+            if len(hits) >= top_k:
+                break
+
+        return tuple(hits)
+
+    def _rebuild_llama_index(self) -> None:
+        if not self._use_llama_index:
+            return
+        if not self._documents:
+            self._llama_index = None
+            return
+
+        llama_documents = [
+            document.to_llamaindex_document()
+            for document in sorted(self._documents.values(), key=lambda item: item.document_id)
+        ]
+        self._llama_index = VectorStoreIndex.from_documents(
+            llama_documents,
+            embed_model=self._llama_embed_model,
+        )
 
 def _cosine_similarity(left: dict[str, float], right: dict[str, float]) -> float:
     if not left or not right:

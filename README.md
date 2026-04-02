@@ -37,18 +37,6 @@ uv run python -m pytest
 uv run streamlit run experimentations/streamlit_whisper_app.py
 ```
 
-### Tester la transcription micro en temps reel
-
-```bash
-uv run python experimentations/live_whisper_cli.py
-```
-
-Options utiles :
-- lister les micros disponibles : `uv run python experimentations/live_whisper_cli.py --list-devices`
-- forcer le CPU : `uv run python experimentations/live_whisper_cli.py --device cpu`
-- utiliser un modele plus leger : `uv run python experimentations/live_whisper_cli.py --model turbo`
-- choisir un micro : `uv run python experimentations/live_whisper_cli.py --input-device "Nom du micro"`
-
 Ensuite :
 - autoriser l'acces au microphone dans le navigateur
 - enregistrer une phrase avec le bouton de capture

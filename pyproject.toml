@@ -12,6 +12,15 @@ dependencies = [
     "torch==2.11.0",
 ]
 
+[project.optional-dependencies]
+memory-backends = [
+    "chromadb>=1.0.8",
+    "llama-index-core",
+    "llama-index-embeddings-huggingface",
+    "neo4j>=5.28.2",
+    "sentence-transformers>=4.1.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.4.0",

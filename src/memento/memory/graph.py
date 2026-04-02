@@ -12,7 +12,7 @@ class NodeSchema:
     """Definition of one graph node label."""
 
     label: str
-    key_property: str
+    key_properties: tuple[str, ...]
     required_properties: tuple[str, ...]
 
 
@@ -73,12 +73,20 @@ class MemoryGraphSchema:
     def default(cls) -> MemoryGraphSchema:
         return cls(
             nodes=(
-                NodeSchema("Patient", "id", ("id", "display_name")),
-                NodeSchema("Person", "id", ("id", "name", "relationship_to_patient")),
-                NodeSchema("Place", "id", ("id", "name", "category")),
-                NodeSchema("Routine", "id", ("id", "title", "schedule")),
-                NodeSchema("Episode", "id", ("id", "title", "narrative")),
-                NodeSchema("Emotion", "id", ("id", "label", "valence", "intensity")),
+                NodeSchema("Patient", ("patient_id", "id"), ("patient_id", "id", "display_name")),
+                NodeSchema(
+                    "Person",
+                    ("patient_id", "id"),
+                    ("patient_id", "id", "name", "relationship_to_patient"),
+                ),
+                NodeSchema("Place", ("patient_id", "id"), ("patient_id", "id", "name", "category")),
+                NodeSchema("Routine", ("patient_id", "id"), ("patient_id", "id", "title", "schedule")),
+                NodeSchema("Episode", ("patient_id", "id"), ("patient_id", "id", "title", "narrative")),
+                NodeSchema(
+                    "Emotion",
+                    ("patient_id", "id"),
+                    ("patient_id", "id", "label", "valence", "intensity"),
+                ),
             ),
             relations=(
                 RelationSchema(
@@ -131,10 +139,11 @@ class MemoryGraphSchema:
 
         lines: list[str] = ["// Neo4j schema for Memento memory graph"]
         for node in self.nodes:
-            constraint_name = f"{node.label.lower()}_{node.key_property}_unique"
+            constraint_name = f"{node.label.lower()}_{'_'.join(node.key_properties)}_unique"
+            key_expression = ", ".join(f"n.{property_name}" for property_name in node.key_properties)
             lines.append(
                 "CREATE CONSTRAINT "
-                f"{constraint_name} IF NOT EXISTS FOR (n:{node.label}) REQUIRE n.{node.key_property} IS UNIQUE;"
+                f"{constraint_name} IF NOT EXISTS FOR (n:{node.label}) REQUIRE ({key_expression}) IS UNIQUE;"
             )
         lines.extend(
             (
@@ -142,6 +151,7 @@ class MemoryGraphSchema:
                 "CREATE INDEX place_name IF NOT EXISTS FOR (n:Place) ON (n.name);",
                 "CREATE INDEX routine_title IF NOT EXISTS FOR (n:Routine) ON (n.title);",
                 "CREATE INDEX episode_title IF NOT EXISTS FOR (n:Episode) ON (n.title);",
+                "CREATE INDEX patient_lookup IF NOT EXISTS FOR (n:Patient) ON (n.patient_id);",
             )
         )
         return "\n".join(lines)
@@ -197,18 +207,26 @@ class PersonalMemoryGraph:
         """Render MERGE statements to seed the current graph into Neo4j."""
 
         lines = ["// Seed data for Memento memory graph"]
+        nodes_by_id = {node.node_id: node for node in self.nodes}
         for node in self.nodes:
+            key_properties = {key: node.properties[key] for key in neo4j_key_properties(node.label)}
             lines.append(
-                f"MERGE (n:{node.label} {{id: {_cypher_value(node.node_id.split(':', 1)[1])}}}) "
+                f"MERGE (n:{node.label} {_cypher_value(key_properties)}) "
                 f"SET n += {_cypher_value(node.properties)};"
             )
         for relation in self._relations:
+            source = nodes_by_id[relation.source_id]
+            target = nodes_by_id[relation.target_id]
+            source_key_properties = {key: source.properties[key] for key in neo4j_key_properties(source.label)}
+            target_key_properties = {key: target.properties[key] for key in neo4j_key_properties(target.label)}
+            relation_properties = dict(relation.properties)
+            relation_properties.setdefault("patient_id", source.properties["patient_id"])
             lines.append(
                 "MATCH "
-                f"(source {{id: {_cypher_value(relation.source_id.split(':', 1)[1])}}}), "
-                f"(target {{id: {_cypher_value(relation.target_id.split(':', 1)[1])}}}) "
+                f"(source:{source.label} {_cypher_value(source_key_properties)}), "
+                f"(target:{target.label} {_cypher_value(target_key_properties)}) "
                 f"MERGE (source)-[r:{relation.relation_type}]->(target) "
-                f"SET r += {_cypher_value(relation.properties)};"
+                f"SET r += {_cypher_value(relation_properties)};"
             )
         return "\n".join(lines)
 
@@ -226,6 +244,7 @@ def build_memory_graph(snapshot: PatientMemorySnapshot) -> PersonalMemoryGraph:
             node_id=patient_node_id,
             label="Patient",
             properties={
+                "patient_id": patient.patient_id,
                 "id": patient.patient_id,
                 "display_name": patient.display_name,
                 "preferred_name": patient.preferred_name,
@@ -242,6 +261,7 @@ def build_memory_graph(snapshot: PatientMemorySnapshot) -> PersonalMemoryGraph:
                 node_id=person_node_id,
                 label="Person",
                 properties={
+                    "patient_id": patient.patient_id,
                     "id": person.person_id,
                     "name": person.name,
                     "relationship_to_patient": person.relationship_to_patient,
@@ -268,6 +288,7 @@ def build_memory_graph(snapshot: PatientMemorySnapshot) -> PersonalMemoryGraph:
                 node_id=_node_key("Place", place.place_id),
                 label="Place",
                 properties={
+                    "patient_id": patient.patient_id,
                     "id": place.place_id,
                     "name": place.name,
                     "category": place.category,
@@ -283,6 +304,7 @@ def build_memory_graph(snapshot: PatientMemorySnapshot) -> PersonalMemoryGraph:
                 node_id=routine_node_id,
                 label="Routine",
                 properties={
+                    "patient_id": patient.patient_id,
                     "id": routine.routine_id,
                     "title": routine.title,
                     "schedule": routine.schedule,
@@ -313,6 +335,7 @@ def build_memory_graph(snapshot: PatientMemorySnapshot) -> PersonalMemoryGraph:
     for episode in snapshot.episodes:
         _append_episode(
             episode=episode,
+            patient_id=patient.patient_id,
             patient_node_id=patient_node_id,
             nodes=nodes,
             relations=relations,
@@ -329,6 +352,7 @@ def default_memory_schema() -> MemoryGraphSchema:
 
 def _append_episode(
     episode: MemoryEpisode,
+    patient_id: str,
     patient_node_id: str,
     nodes: list[MemoryNode],
     relations: list[MemoryRelation],
@@ -339,6 +363,7 @@ def _append_episode(
             node_id=episode_node_id,
             label="Episode",
             properties={
+                "patient_id": patient_id,
                 "id": episode.episode_id,
                 "title": episode.title,
                 "narrative": episode.narrative,
@@ -380,6 +405,7 @@ def _append_episode(
                 node_id=emotion_node_id,
                 label="Emotion",
                 properties={
+                    "patient_id": patient_id,
                     "id": f"{episode.episode_id}:{index}:{emotion.label.lower()}",
                     "label": emotion.label,
                     "valence": emotion.valence,
@@ -403,6 +429,12 @@ def _append_episode(
 
 def _node_key(label: str, raw_id: str) -> str:
     return f"{label.lower()}:{raw_id}"
+
+
+def neo4j_key_properties(label: str) -> tuple[str, ...]:
+    """Return the properties used to identify one node in Neo4j."""
+
+    return ("patient_id", "id")
 
 
 def _cypher_value(value: object) -> str:

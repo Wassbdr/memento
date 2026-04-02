@@ -56,3 +56,16 @@ Transformer les reponses texte en experience vocale fluide, claire et rassurante
 - [ ] Mesurer l'experience temps reel
   Objectif : verifier que le cycle complet reste supportable pour un usage quotidien.
   Livrable : des indicateurs de latence bout-en-bout et seuils cibles.
+
+### 5. Produit et confiance
+Encadrer les usages, le consentement et la qualite globale du systeme avant d'aller vers des interfaces plus riches.
+
+- [ ] Definir l'apport des aidants et de la famille
+  Objectif : structurer la collecte manuelle de souvenirs, routines et profils proches.
+  Livrable : un backlog fonctionnel de l'application compagnon et de ses flux de donnees.
+- [ ] Cadencer la collecte contextuelle consentie
+  Objectif : encadrer les captures automatiques de conversations, visites et emotions.
+  Livrable : une politique de consentement, retention et suppression des donnees.
+- [ ] Preparer l'extension visuelle future
+  Objectif : garder une architecture compatible avec lunettes connectees et reconnaissance faciale.
+  Livrable : une note d'architecture listant les points d'extension et les risques.

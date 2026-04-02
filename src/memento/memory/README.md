@@ -9,7 +9,11 @@ Il fournit trois briques:
 - une collection vectorielle locale de reference, compatible conceptuellement avec ChromaDB
 
 Le package fournit aujourd'hui un prototype local de reference.
-Il ne branche pas encore de client Neo4j, ChromaDB ou LlamaIndex en production.
+Par defaut, il tourne entierement en local, sans dependances externes obligatoires.
+Il expose aussi des adaptateurs optionnels `Neo4jGraphStore` et `ChromaSemanticIndex`
+pour brancher de vraies backends via l'extra `memory-backends`.
+`LlamaIndexSemanticIndex` peut egalement utiliser la vraie pile LlamaIndex via
+`use_llama_index=True` quand les dependances optionnelles sont installees.
 
 Objets principaux:
 
@@ -25,3 +29,8 @@ Cycle recommande:
 1. modeliser le patient, ses proches, lieux, routines et souvenirs dans un `PatientMemorySnapshot`
 2. appeler `MemorySyncEngine.sync_snapshot(snapshot)`
 3. utiliser `MemorySyncEngine.recall(patient_id, query)` pour recuperer des souvenirs semantiques enrichis par le graphe
+
+Notes d'integration:
+
+- les backends externes peuvent etre fermes via `close()`
+- `MemorySyncEngine` supporte aussi `with ... as engine:` pour fermer proprement ses backends

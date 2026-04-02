@@ -31,6 +31,8 @@ from .audio import (
 )
 from .memory import (
     AffectiveState,
+    ChromaSemanticIndex,
+    GraphStore,
     InMemoryChromaCollection,
     InMemoryGraphStore,
     LlamaIndexSemanticIndex,
@@ -44,6 +46,7 @@ from .memory import (
     MemoryRelation,
     MemorySyncEngine,
     MemorySyncReport,
+    Neo4jGraphStore,
     PatientMemorySnapshot,
     PatientProfile,
     PersonProfile,
@@ -51,6 +54,7 @@ from .memory import (
     PlaceProfile,
     RoutineProfile,
     SemanticMemoryIndex,
+    SemanticIndex,
     SemanticSearchHit,
     build_memory_graph,
     default_memory_schema,
@@ -59,9 +63,11 @@ from .todo import ProjectScope, build_default_scope
 
 __all__ = [
     "AudioFrame",
+    "ChromaSemanticIndex",
     "CaptureHealthReport",
     "CaptureHealthSnapshot",
     "EnergyVAD",
+    "GraphStore",
     "InMemoryChromaCollection",
     "InMemoryGraphStore",
     "InputDeviceInfo",
@@ -77,6 +83,7 @@ __all__ = [
     "MemorySyncEngine",
     "MemorySyncReport",
     "MicrophoneConfig",
+    "Neo4jGraphStore",
     "OpenAIWhisperBackend",
     "ProjectScope",
     "PatientMemorySnapshot",
@@ -88,6 +95,7 @@ __all__ = [
     "RoutineProfile",
     "SegmentTranscription",
     "SemanticMemoryIndex",
+    "SemanticIndex",
     "SemanticSearchHit",
     "SoundDeviceInput",
     "SpeechSegment",

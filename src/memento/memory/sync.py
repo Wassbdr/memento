@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .graph import PersonalMemoryGraph, build_memory_graph
+from .interfaces import GraphStore, SemanticIndex
 from .models import PatientMemorySnapshot
 from .semantic import LlamaIndexSemanticIndex, MemoryDocumentProjector
 
@@ -53,11 +54,20 @@ class InMemoryGraphStore:
 
     def replace_snapshot(self, snapshot: PatientMemorySnapshot) -> PersonalMemoryGraph:
         graph = build_memory_graph(snapshot)
-        self._graphs[snapshot.patient.patient_id] = graph
+        return self.replace_graph(snapshot.patient.patient_id, graph)
+
+    def replace_graph(self, patient_id: str, graph: PersonalMemoryGraph) -> PersonalMemoryGraph:
+        self._graphs[patient_id] = graph
         return graph
+
+    def delete_patient(self, patient_id: str) -> None:
+        self._graphs.pop(patient_id, None)
 
     def graph_for_patient(self, patient_id: str) -> PersonalMemoryGraph | None:
         return self._graphs.get(patient_id)
+
+    def close(self) -> None:
+        """Release resources held by the in-memory graph store."""
 
 
 class MemorySyncEngine:
@@ -65,42 +75,65 @@ class MemorySyncEngine:
 
     def __init__(
         self,
-        graph_store: InMemoryGraphStore | None = None,
-        semantic_index: LlamaIndexSemanticIndex | None = None,
+        graph_store: GraphStore | None = None,
+        semantic_index: SemanticIndex | None = None,
         projector: MemoryDocumentProjector | None = None,
     ) -> None:
         self._graph_store = graph_store or InMemoryGraphStore()
         self._semantic_index = semantic_index or LlamaIndexSemanticIndex()
         self._projector = projector or MemoryDocumentProjector()
-        self._document_ids_by_patient: dict[str, tuple[str, ...]] = {}
 
     @property
-    def graph_store(self) -> InMemoryGraphStore:
+    def graph_store(self) -> GraphStore:
         return self._graph_store
 
     @property
-    def semantic_index(self) -> LlamaIndexSemanticIndex:
+    def semantic_index(self) -> SemanticIndex:
         return self._semantic_index
 
+    def __enter__(self) -> MemorySyncEngine:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    def close(self) -> None:
+        graph_close = getattr(self._graph_store, "close", None)
+        if callable(graph_close):
+            graph_close()
+
+        semantic_close = getattr(self._semantic_index, "close", None)
+        if callable(semantic_close):
+            semantic_close()
+
     def sync_snapshot(self, snapshot: PatientMemorySnapshot) -> MemorySyncReport:
-        graph = self._graph_store.replace_snapshot(snapshot)
+        patient_id = snapshot.patient.patient_id
+        previous_graph = self._graph_store.graph_for_patient(patient_id)
+        graph = build_memory_graph(snapshot)
         documents = self._projector.project(snapshot)
+        deleted_documents = 0
 
-        previous_ids = set(self._document_ids_by_patient.get(snapshot.patient.patient_id, ()))
-        current_ids = {document.document_id for document in documents}
-        stale_ids = tuple(sorted(previous_ids - current_ids))
-        if stale_ids:
-            self._semantic_index.delete(stale_ids)
-
-        self._semantic_index.ingest(documents)
-        self._document_ids_by_patient[snapshot.patient.patient_id] = tuple(sorted(current_ids))
+        try:
+            persisted_graph = self._graph_store.replace_graph(patient_id, graph)
+            deleted_documents = self._semantic_index.replace_documents(patient_id, documents)
+        except Exception:
+            try:
+                if previous_graph is None:
+                    self._graph_store.delete_patient(patient_id)
+                else:
+                    self._graph_store.replace_graph(patient_id, previous_graph)
+            except Exception as rollback_error:
+                raise RuntimeError(
+                    f"memory sync failed for patient {patient_id} and graph rollback also failed"
+                ) from rollback_error
+            raise
 
         return MemorySyncReport(
-            patient_id=snapshot.patient.patient_id,
-            graph_nodes_written=len(graph.nodes),
-            graph_relations_written=len(graph.relations),
+            patient_id=patient_id,
+            graph_nodes_written=len(persisted_graph.nodes),
+            graph_relations_written=len(persisted_graph.relations),
             indexed_documents=len(documents),
-            deleted_documents=len(stale_ids),
+            deleted_documents=deleted_documents,
         )
 
     def recall(
