@@ -179,7 +179,9 @@ class PersonalMemoryGraph:
         neighbors: list[GraphNeighbor] = []
         for relation in self._relations:
             if relation.source_id == node_id:
-                target = self._nodes[relation.target_id]
+                target = self._nodes.get(relation.target_id)
+                if target is None:
+                    continue
                 neighbors.append(
                     GraphNeighbor(
                         relation_type=relation.relation_type,
@@ -188,7 +190,9 @@ class PersonalMemoryGraph:
                     )
                 )
             elif relation.target_id == node_id:
-                source = self._nodes[relation.source_id]
+                source = self._nodes.get(relation.source_id)
+                if source is None:
+                    continue
                 neighbors.append(
                     GraphNeighbor(
                         relation_type=relation.relation_type,

@@ -249,8 +249,12 @@ class ChromaSemanticIndex:
         hits: list[SemanticSearchHit] = []
         for document_id, text, metadata, distance in zip(ids, documents, metadatas, distances, strict=False):
             payload = dict(metadata or {})
-            source_node_id = str(payload.pop("source_node_id"))
-            source_label = str(payload.get("source_label", ""))
+            source_label = str(payload.get("source_label", "") or "Unknown")
+            source_node_id = _safe_source_node_id(
+                payload,
+                source_label=source_label,
+                document_id=str(document_id),
+            )
             score = round(1.0 / (1.0 + float(distance or 0.0)), 4)
             hits.append(
                 SemanticSearchHit(
@@ -279,8 +283,12 @@ class ChromaSemanticIndex:
         loaded_documents: list[MemoryDocument] = []
         for document_id, text, metadata in zip(ids, documents, metadatas, strict=False):
             payload = dict(metadata or {})
-            source_node_id = str(payload.pop("source_node_id"))
-            source_label = str(payload.get("source_label", ""))
+            source_label = str(payload.get("source_label", "") or "Unknown")
+            source_node_id = _safe_source_node_id(
+                payload,
+                source_label=source_label,
+                document_id=str(document_id),
+            )
             loaded_documents.append(
                 MemoryDocument(
                     document_id=str(document_id),
@@ -383,6 +391,24 @@ def _document_metadata(document: MemoryDocument) -> dict[str, object]:
     metadata["source_node_id"] = document.source_node_id
     metadata["source_label"] = document.source_label
     return metadata
+
+
+def _safe_source_node_id(
+    payload: dict[str, object],
+    *,
+    source_label: str,
+    document_id: str,
+) -> str:
+    raw_source_node_id = payload.pop("source_node_id", None)
+    if raw_source_node_id is not None:
+        source_node_id = str(raw_source_node_id).strip()
+        if source_node_id:
+            return source_node_id
+
+    normalized_label = source_label.strip().lower()
+    if normalized_label and normalized_label != "unknown":
+        return f"{normalized_label}:{document_id}"
+    return f"document:{document_id}"
 
 
 def _chroma_where_clause(

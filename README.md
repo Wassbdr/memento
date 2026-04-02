@@ -17,6 +17,44 @@ Micro → Whisper + VAD
               ↓
            Haut-parleur
 
+## Fonctionnement de la memoire
+
+La memoire suit une logique knowledge graph + recherche semantique.
+
+1. Ingestion:
+- l'application compose un `PatientMemorySnapshot`
+- le snapshot est synchronise via `MemorySyncEngine.sync_snapshot(...)`
+- le moteur met a jour en parallele:
+    - le graphe patient (relations explicites)
+    - l'index semantique (recuperation contextuelle)
+
+2. Recuperation:
+- `MemorySyncEngine.recall(...)` retrouve des souvenirs pertinents
+- les hits sont reclasses avec un score clinique explicable (`score_breakdown`)
+- `MemorySyncEngine.reorientation_context(...)` produit un contexte de reassurance pret a etre injecte dans la reponse vocale
+
+Voir la documentation detaillee de la couche memory:
+- `src/memento/memory/README.md`
+
+## Chemin de la donnee
+
+Chemin ecriture:
+
+`PatientMemorySnapshot`
+-> projection graphe
+-> ecriture `GraphStore`
+-> projection documents
+-> ecriture `SemanticIndex`
+
+Chemin lecture:
+
+`question patient`
+-> recherche semantique
+-> enrichment par le graphe
+-> scoring explicable
+-> contexte de reorientation
+-> generation de reponse vocale
+
 ## Comment tester
 
 ### Installer l'environnement

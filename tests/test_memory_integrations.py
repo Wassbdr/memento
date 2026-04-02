@@ -270,6 +270,47 @@ def test_chroma_semantic_index_search_filters_hits(monkeypatch) -> None:
     assert index._client.closed is True
 
 
+def test_chroma_semantic_index_search_handles_legacy_metadata_without_source_node_id(monkeypatch) -> None:
+    monkeypatch.setattr(integrations_module, "chromadb", object())
+    monkeypatch.setattr(integrations_module, "SentenceTransformerEmbeddingFunction", object())
+    collection = FakeChromaCollection()
+    collection.documents["legacy:1"] = (
+        "Souvenir cuisine du dimanche",
+        {"patient_id": "rose", "source_label": "Episode"},
+    )
+
+    index = ChromaSemanticIndex(
+        client=FakeChromaClient(collection),
+        embedding_function=object(),
+    )
+
+    hits = index.search("cuisine", patient_id="rose", top_k=1)
+
+    assert hits
+    assert hits[0].document.source_node_id == "episode:legacy:1"
+    assert hits[0].document.source_label == "Episode"
+
+
+def test_chroma_semantic_index_replace_documents_handles_legacy_metadata_without_source_node_id(monkeypatch) -> None:
+    monkeypatch.setattr(integrations_module, "chromadb", object())
+    monkeypatch.setattr(integrations_module, "SentenceTransformerEmbeddingFunction", object())
+    collection = FakeChromaCollection()
+    collection.documents["legacy:1"] = (
+        "Souvenir cuisine du dimanche",
+        {"patient_id": "rose", "source_label": "Episode"},
+    )
+
+    index = ChromaSemanticIndex(
+        client=FakeChromaClient(collection),
+        embedding_function=object(),
+    )
+
+    deleted = index.replace_documents("rose", ())
+
+    assert deleted == 1
+    assert collection.documents == {}
+
+
 @dataclass
 class FakeLlamaDocument:
     text: str
@@ -302,6 +343,8 @@ class FakeRetriever:
 
 
 class FakeVectorStoreIndex:
+    last_similarity_top_k = None
+
     def __init__(self, documents, embed_model) -> None:
         self._documents = list(documents)
         self._embed_model = embed_model
@@ -311,6 +354,7 @@ class FakeVectorStoreIndex:
         return cls(documents, embed_model)
 
     def as_retriever(self, similarity_top_k):
+        type(self).last_similarity_top_k = similarity_top_k
         return FakeRetriever(self._documents[:similarity_top_k])
 
 
@@ -333,3 +377,35 @@ def test_llamaindex_semantic_index_uses_real_path_when_enabled(monkeypatch) -> N
     assert deleted_documents == 0
     assert hits
     assert hits[0].document.source_label == "Routine"
+
+
+def test_llamaindex_semantic_index_bounds_patient_scoped_retrieval_pool(monkeypatch) -> None:
+    monkeypatch.setattr(semantic_module, "LlamaIndexDocument", FakeLlamaDocument)
+    monkeypatch.setattr(semantic_module, "VectorStoreIndex", FakeVectorStoreIndex)
+    monkeypatch.setattr(semantic_module, "HuggingFaceEmbedding", FakeHuggingFaceEmbedding)
+
+    index = LlamaIndexSemanticIndex(use_llama_index=True)
+    rose_documents = MemoryDocumentProjector().project(build_snapshot())
+
+    def _lucie_document_id(document_id: str) -> str:
+        if document_id == "patient:rose":
+            return "patient:lucie"
+        return document_id.replace(":rose:", ":lucie:")
+
+    lucie_documents = tuple(
+        semantic_module.MemoryDocument(
+            document_id=_lucie_document_id(document.document_id),
+            source_node_id=document.source_node_id,
+            source_label=document.source_label,
+            text=document.text.replace("Rose", "Lucie"),
+            metadata={**document.metadata, "patient_id": "lucie"},
+        )
+        for document in rose_documents
+    )
+
+    index.ingest(rose_documents + lucie_documents)
+
+    hits = index.search("cuisine", patient_id="rose", source_labels=("Routine",), top_k=1)
+
+    assert hits
+    assert FakeVectorStoreIndex.last_similarity_top_k == len(rose_documents)

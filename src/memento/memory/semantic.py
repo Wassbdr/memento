@@ -9,6 +9,8 @@ from typing import Protocol
 
 from .models import PatientMemorySnapshot
 
+_LLAMA_RETRIEVAL_OVERSAMPLING_FACTOR = 8
+
 try:
     from llama_index.core import VectorStoreIndex
     from llama_index.core.schema import Document as LlamaIndexDocument
@@ -354,7 +356,9 @@ class LlamaIndexSemanticIndex(SemanticMemoryIndex):
             )
 
         self._documents: dict[str, MemoryDocument] = {}
+        self._documents_by_patient: dict[str, dict[str, MemoryDocument]] = {}
         self._llama_index: object | None = None
+        self._llama_indexes_by_patient: dict[str, object] = {}
         self._llama_embed_model = llama_embed_model or HuggingFaceEmbedding(model_name=llama_embedding_model)
 
     def ingest(self, documents: tuple[MemoryDocument, ...]) -> None:
@@ -419,12 +423,15 @@ class LlamaIndexSemanticIndex(SemanticMemoryIndex):
 
         if top_k <= 0:
             raise ValueError("top_k must be positive")
-        if not self._documents or self._llama_index is None:
+        index, corpus_size = self._index_for_search(patient_id)
+        if index is None or corpus_size == 0:
             return ()
 
-        retriever = self._llama_index.as_retriever(
-            similarity_top_k=max(top_k, len(self._documents)),
+        retrieval_pool_size = min(
+            corpus_size,
+            max(top_k * _LLAMA_RETRIEVAL_OVERSAMPLING_FACTOR, top_k),
         )
+        retriever = index.as_retriever(similarity_top_k=retrieval_pool_size)
         raw_hits = retriever.retrieve(query)
 
         hits: list[SemanticSearchHit] = []
@@ -456,16 +463,49 @@ class LlamaIndexSemanticIndex(SemanticMemoryIndex):
             return
         if not self._documents:
             self._llama_index = None
+            self._documents_by_patient = {}
+            self._llama_indexes_by_patient = {}
             return
 
-        llama_documents = [
-            document.to_llamaindex_document()
-            for document in sorted(self._documents.values(), key=lambda item: item.document_id)
-        ]
-        self._llama_index = VectorStoreIndex.from_documents(
-            llama_documents,
-            embed_model=self._llama_embed_model,
-        )
+        sorted_documents = sorted(self._documents.values(), key=lambda item: item.document_id)
+        self._llama_index = _build_llama_index(sorted_documents, self._llama_embed_model)
+
+        documents_by_patient: dict[str, dict[str, MemoryDocument]] = {}
+        for document in sorted_documents:
+            patient_id = str(document.metadata.get("patient_id", "")).strip()
+            if not patient_id:
+                continue
+            patient_documents = documents_by_patient.setdefault(patient_id, {})
+            patient_documents[document.document_id] = document
+
+        self._documents_by_patient = documents_by_patient
+        self._llama_indexes_by_patient = {
+            patient_id: _build_llama_index(
+                sorted(patient_documents.values(), key=lambda item: item.document_id),
+                self._llama_embed_model,
+            )
+            for patient_id, patient_documents in documents_by_patient.items()
+        }
+
+    def _index_for_search(self, patient_id: str | None) -> tuple[object | None, int]:
+        if patient_id is None:
+            return self._llama_index, len(self._documents)
+
+        patient_documents = self._documents_by_patient.get(patient_id)
+        if not patient_documents:
+            return None, 0
+        return self._llama_indexes_by_patient.get(patient_id), len(patient_documents)
+
+
+def _build_llama_index(documents: list[MemoryDocument], embed_model: object) -> object:
+    llama_documents = [
+        document.to_llamaindex_document()
+        for document in documents
+    ]
+    return VectorStoreIndex.from_documents(
+        llama_documents,
+        embed_model=embed_model,
+    )
 
 def _cosine_similarity(left: dict[str, float], right: dict[str, float]) -> float:
     if not left or not right:

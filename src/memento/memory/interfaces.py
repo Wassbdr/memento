@@ -39,7 +39,11 @@ class SemanticIndex(Protocol):
         """Delete documents by their stable identifiers."""
 
     def replace_documents(self, patient_id: str, documents: tuple[MemoryDocument, ...]) -> int:
-        """Replace one patient's document set and return the deleted document count."""
+        """Replace one patient's document set atomically and return deleted count.
+
+        If an exception is raised, the previous patient-scoped documents must remain
+        queryable so the synchronization engine can safely roll back graph writes.
+        """
 
     def close(self) -> None:
         """Release any underlying resources held by the semantic backend."""
