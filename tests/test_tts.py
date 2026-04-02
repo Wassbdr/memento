@@ -190,3 +190,52 @@ def test_qwen_backend_rejects_non_wav_output(monkeypatch) -> None:
         assert "only `wav`" in str(exc)
     else:
         raise AssertionError("Expected ValueError when Qwen backend is asked for PCM output")
+
+
+def test_qwen_backend_reuses_loaded_model_across_backend_instances(monkeypatch) -> None:
+    class FakeGeneratedAudio:
+        def tolist(self):
+            return [0.0, 0.25, -0.25]
+
+    class FakeQwenModel:
+        from_pretrained_calls = 0
+
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs):
+            cls.from_pretrained_calls += 1
+            return cls()
+
+        def generate_custom_voice(self, **kwargs):
+            return [FakeGeneratedAudio()], 24_000
+
+    class FakeQwenModule:
+        Qwen3TTSModel = FakeQwenModel
+
+    monkeypatch.setitem(sys.modules, "qwen_tts", FakeQwenModule)
+
+    config = TextToSpeechConfig(
+        model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+        voice_id="Vivian",
+        response_format="wav",
+        language="French",
+        device_map="cpu",
+    )
+    first_backend = QwenTTSBackend(config)
+    second_backend = QwenTTSBackend(config)
+
+    first_backend.synthesize(
+        text="Bonjour",
+        model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+        voice_id="Vivian",
+        response_format="wav",
+        reference_audio_base64=None,
+    )
+    second_backend.synthesize(
+        text="Rebonjour",
+        model_name=DEFAULT_QWEN_TTS_MODEL_NAME,
+        voice_id="Vivian",
+        response_format="wav",
+        reference_audio_base64=None,
+    )
+
+    assert FakeQwenModel.from_pretrained_calls == 1

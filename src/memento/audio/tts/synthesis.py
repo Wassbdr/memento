@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from importlib import import_module
 from io import BytesIO
 from pathlib import Path
+from threading import Lock
 from time import perf_counter
 from typing import Protocol
 import wave
@@ -16,6 +17,8 @@ DEFAULT_QWEN_TTS_MODEL_NAME = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 DEFAULT_QWEN_TTS_LANGUAGE = "French"
 DEFAULT_QWEN_TTS_SPEAKER = "Vivian"
 SUPPORTED_TTS_RESPONSE_FORMATS = ("pcm", "wav")
+_QWEN_MODEL_CACHE_LOCK = Lock()
+_QWEN_MODEL_CACHE: dict[tuple[str, str | None, str | None, str | None], object] = {}
 
 
 @dataclass(frozen=True)
@@ -230,7 +233,21 @@ class QwenTTSBackend:
             if self._config.attn_implementation is not None:
                 load_kwargs["attn_implementation"] = self._config.attn_implementation
 
-            self._model = model_class.from_pretrained(self._config.model_name, **load_kwargs)
+            cache_key = (
+                self._config.model_name,
+                resolved_device_map,
+                self._config.dtype,
+                self._config.attn_implementation,
+            )
+            with _QWEN_MODEL_CACHE_LOCK:
+                cached_model = _QWEN_MODEL_CACHE.get(cache_key)
+                if cached_model is None:
+                    # Keep a single loaded Qwen model per process to avoid repeated heavyweight
+                    # allocations across short-lived backend instances (for example Streamlit reruns).
+                    _QWEN_MODEL_CACHE.clear()
+                    cached_model = model_class.from_pretrained(self._config.model_name, **load_kwargs)
+                    _QWEN_MODEL_CACHE[cache_key] = cached_model
+                self._model = cached_model
         return self._model
 
 
