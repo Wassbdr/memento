@@ -7,7 +7,7 @@ from datetime import datetime
 import re
 from time import perf_counter
 
-from memento.memory import MemorySyncEngine, PatientReorientationContext
+from memento.memory import EmotionalState, MemorySyncEngine, PatientReorientationContext
 
 from .generation import (
     DEFAULT_MINISTRAL_MODEL_NAME,
@@ -152,6 +152,8 @@ class ConversationOrchestrator:
         conversation_history: tuple[ConversationMessage, ...] = (),
         source_labels: tuple[str, ...] | None = None,
         reference_datetime: datetime | None = None,
+        include_archived: bool = False,
+        emotional_state: EmotionalState | None = None,
     ) -> ConversationResponse:
         normalized_patient_id = patient_id.strip()
         if not normalized_patient_id:
@@ -170,6 +172,8 @@ class ConversationOrchestrator:
             routines_limit=self._config.routines_limit,
             source_labels=source_labels,
             reference_datetime=reference_datetime,
+            include_archived=include_archived,
+            emotional_state=emotional_state,
         )
         system_prompt = self._config.system_instruction
         user_prompt = _build_user_prompt(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass(frozen=True)
@@ -90,6 +91,8 @@ class RoutineProfile:
     cue: str = ""
     support_strategy: str = ""
     place_id: str | None = None
+    last_validated_on: str = ""
+    archived_on: str = ""
 
     def __post_init__(self) -> None:
         if not self.routine_id.strip():
@@ -100,6 +103,8 @@ class RoutineProfile:
             raise ValueError("schedule must not be empty")
         if not self.description.strip():
             raise ValueError("description must not be empty")
+        _validate_optional_iso_date(self.last_validated_on, field_name="last_validated_on")
+        _validate_optional_iso_date(self.archived_on, field_name="archived_on")
 
 
 @dataclass(frozen=True)
@@ -114,6 +119,8 @@ class MemoryEpisode:
     place_id: str | None = None
     emotions: tuple[AffectiveState, ...] = ()
     tags: tuple[str, ...] = ()
+    last_validated_on: str = ""
+    archived_on: str = ""
 
     def __post_init__(self) -> None:
         if not self.episode_id.strip():
@@ -124,6 +131,9 @@ class MemoryEpisode:
             raise ValueError("narrative must not be empty")
         if len(set(self.people_ids)) != len(self.people_ids):
             raise ValueError("people_ids must be unique within one episode")
+        _validate_optional_iso_date(self.happened_on, field_name="happened_on")
+        _validate_optional_iso_date(self.last_validated_on, field_name="last_validated_on")
+        _validate_optional_iso_date(self.archived_on, field_name="archived_on")
 
 
 @dataclass(frozen=True)
@@ -174,3 +184,13 @@ class PatientMemorySnapshot:
 def _assert_unique_ids(values: tuple[str, ...], message: str) -> None:
     if len(set(values)) != len(values):
         raise ValueError(message)
+
+
+def _validate_optional_iso_date(value: str, *, field_name: str) -> None:
+    text = value.strip()
+    if not text:
+        return
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+    except ValueError as error:
+        raise ValueError(f"{field_name} must use YYYY-MM-DD format") from error

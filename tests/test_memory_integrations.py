@@ -16,6 +16,11 @@ class FakeCursor:
     def consume(self) -> None:
         return None
 
+    def single(self):
+        if not self._records:
+            return None
+        return self._records[0]
+
     def __iter__(self):
         return iter(self._records)
 
@@ -36,6 +41,11 @@ class FakeNeo4jSession:
             return FakeCursor(self._driver.node_records)
         if query == integrations_module._LOAD_PATIENT_RELATIONS_QUERY:
             return FakeCursor(self._driver.relation_records)
+        if query == integrations_module._LOAD_PATIENT_RECALL_CONTEXT_QUERY:
+            record = self._driver.patient_context_record
+            return FakeCursor([] if record is None else [record])
+        if query == integrations_module._BATCH_RECALL_CONTEXT_QUERY:
+            return FakeCursor(self._driver.batch_recall_records)
         return FakeCursor()
 
     def execute_write(self, fn, *args):
@@ -47,6 +57,8 @@ class FakeNeo4jDriver:
         self.calls: list[tuple[str, dict[str, object]]] = []
         self.node_records = []
         self.relation_records = []
+        self.patient_context_record = None
+        self.batch_recall_records = []
         self.closed = False
 
     def session(self, *, database):
@@ -202,6 +214,52 @@ def test_neo4j_graph_store_replaces_and_loads_graph() -> None:
     graph_store.close()
 
     assert driver.closed is True
+
+
+def test_neo4j_graph_store_batches_recall_context_query() -> None:
+    driver = FakeNeo4jDriver()
+    driver.patient_context_record = {
+        "patient_id": "rose",
+        "anchors": ["Appartement rue des Lilas"],
+        "trusted_people": ["claire martin"],
+    }
+    driver.batch_recall_records = [
+        {
+            "source_node_id": "episode:dimanche",
+            "source_label": "Episode",
+            "source_properties": {
+                "patient_id": "rose",
+                "id": "dimanche",
+                "title": "Dejeuner du dimanche",
+                "last_validated_on": "2024-01-08",
+            },
+            "neighbors": [
+                {"label": "Person", "display_name": "Claire Martin", "intensity": None},
+                {"label": "Place", "display_name": "Cuisine", "intensity": None},
+                {"label": "Emotion", "display_name": "joie", "intensity": 0.8},
+            ],
+        }
+    ]
+
+    graph_store = Neo4jGraphStore(
+        uri="bolt://example",
+        username="neo4j",
+        password="password",
+        ensure_schema=False,
+        driver=driver,
+    )
+
+    payload = graph_store.batch_recall_context(
+        patient_id="rose",
+        source_node_ids=("episode:dimanche",),
+    )
+
+    assert payload["patient_found"] is True
+    assert payload["anchor_terms"] == ("Appartement rue des Lilas",)
+    assert payload["trusted_people"] == ("claire martin",)
+    assert "episode:dimanche" in payload["contexts"]
+    assert payload["contexts"]["episode:dimanche"]["related_people"] == ("Claire Martin",)
+    assert payload["contexts"]["episode:dimanche"]["emotion_intensities"] == (0.8,)
 
 
 def test_chroma_semantic_index_rolls_back_failed_replace(monkeypatch) -> None:

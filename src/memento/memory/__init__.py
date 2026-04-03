@@ -2,6 +2,7 @@
 
 from importlib import import_module
 
+from .emotion import EmotionalState, EmotionalStateDetector, RuleBasedEmotionalStateDetector
 from .graph import (
     GraphNeighbor,
     MemoryGraphSchema,
@@ -13,6 +14,7 @@ from .graph import (
     build_memory_graph,
     default_memory_schema,
 )
+from .ingestion import reconcile_snapshot
 from .interfaces import GraphStore, SemanticIndex
 from .models import (
     AffectiveState,
@@ -35,28 +37,41 @@ from .semantic import (
 )
 from .sync import (
     InMemoryGraphStore,
+    InMemoryTransactionLog,
+    JsonlTransactionLog,
     MemoryContextHit,
     MemoryIntegrityIssue,
+    MemoryIngestionIssue,
+    MemoryIngestionReport,
     MemoryRecall,
     MemoryScoreBreakdown,
     MemorySyncEngine,
     MemorySyncReport,
+    MemoryTransactionReport,
     PatientMemoryIntegrityReport,
     PatientReorientationContext,
     RoutineSupportContext,
     TrustedPersonContext,
 )
+from .weighting import ClinicalWeightProfile
 
 __all__ = [
     "AffectiveState",
+    "ClinicalWeightProfile",
     "ChromaSemanticIndex",
+    "EmotionalState",
+    "EmotionalStateDetector",
     "GraphNeighbor",
     "GraphStore",
     "InMemoryChromaCollection",
     "InMemoryGraphStore",
+    "InMemoryTransactionLog",
+    "JsonlTransactionLog",
     "LlamaIndexSemanticIndex",
     "MemoryContextHit",
     "MemoryIntegrityIssue",
+    "MemoryIngestionIssue",
+    "MemoryIngestionReport",
     "MemoryDocument",
     "MemoryDocumentProjector",
     "MemoryEpisode",
@@ -67,6 +82,7 @@ __all__ = [
     "MemoryRelation",
     "MemorySyncEngine",
     "MemorySyncReport",
+    "MemoryTransactionReport",
     "NodeSchema",
     "Neo4jGraphStore",
     "PatientMemorySnapshot",
@@ -79,6 +95,7 @@ __all__ = [
     "RelationSchema",
     "RoutineSupportContext",
     "RoutineProfile",
+    "RuleBasedEmotionalStateDetector",
     "SemanticMemoryIndex",
     "SemanticIndex",
     "SemanticSearchHit",
@@ -87,6 +104,7 @@ __all__ = [
     "TokenTextEmbedder",
     "build_memory_graph",
     "default_memory_schema",
+    "reconcile_snapshot",
 ]
 
 

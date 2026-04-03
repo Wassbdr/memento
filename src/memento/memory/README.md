@@ -16,12 +16,16 @@ Le dossier est organise par responsabilite pour eviter un bloc monolithique:
 - `graph.py`: projection knowledge graph + export Cypher
 - `semantic.py`: indexation/recherche semantique locale et option LlamaIndex
 - `graph_store.py`: stockage graphe en memoire
+- `ingestion.py`: validation et reconciliation des conflits d'entree
+- `emotion.py`: couche emotionnelle (detecteur injectable)
 - `recall.py`: hydration des hits semantiques avec contexte graphe
 - `reorientation.py`: extraction de contexte de reassurance patient
 - `sync_engine.py`: orchestration sync graphe/index + API publique
 - `sync_types.py`: dataclasses de sortie (`MemoryRecall`, `PatientReorientationContext`, ...)
 - `sync.py`: facade de compatibilite qui re-exporte l'API sync
+- `transaction_log.py`: journal WAL et reprise des transactions inachevees
 - `temporal.py`: logique temporelle routines/souvenirs (proximite et recence)
+- `weighting.py`: profils de pondération cliniques dynamiques
 - `integrity.py`: controles de coherence graphe/index et reparation
 - `integrations.py`: adaptateurs optionnels Neo4j et ChromaDB
 
@@ -47,14 +51,19 @@ Le fonctionnement est organise en deux boucles complementaires.
 
 1. Ecriture (ingestion/synchronisation):
 - l'application construit un `PatientMemorySnapshot` (patient, proches, lieux, routines, episodes)
+- `reconcile_snapshot(snapshot)` normalise les doublons/alias et signale les conflits detectes
 - `MemorySyncEngine.sync_snapshot(snapshot)` projette ce snapshot vers:
 	- un graphe de connaissances (`build_memory_graph` + `GraphStore`)
 	- un index semantique (`MemoryDocumentProjector` + `SemanticIndex`)
-- la synchronisation est transactionnelle au niveau moteur:
+- la synchronisation est transactionnelle au niveau moteur (via transaction explicite graph/index):
 	- si l'index semantique echoue, le graphe est restaure
+	- chaque tentative est journalisee dans une WAL (write-ahead log)
 
 2. Lecture (rappel/reorientation):
-- `MemorySyncEngine.recall(...)` interroge l'index semantique puis hydrate chaque hit avec le graphe
+- `MemorySyncEngine.recall(...)` interroge l'index semantique puis hydrate les hits via une passe unique sur les relations graphe
+- si le backend expose `batch_recall_context` (Neo4j), la lecture utilise un chargement batch des contextes candidats
+- les souvenirs archives sont exclus par defaut (`include_archived=False`)
+- un profil de poids clinique dynamique est resolu selon l'heure et l'etat emotionnel
 - le ranking final est explicable via `score_breakdown`:
 	- score semantique
 	- bonus contexte graphe
@@ -62,6 +71,7 @@ Le fonctionnement est organise en deux boucles complementaires.
 	- bonus proches de confiance
 	- bonus temporalite/recence
 	- bonus anchors
+	- penalite d'obsolescence (`staleness_penalty`) selon `last_validated_on`
 - `MemorySyncEngine.reorientation_context(...)` construit ensuite un contexte patient pret pour la conversation (identite, reperes, proches, routines, souvenirs pertinents)
 
 Cycle recommande:
@@ -75,6 +85,7 @@ Cycle recommande:
 ### Chemin ecriture
 
 `PatientMemorySnapshot`
+-> `reconcile_snapshot(...)`
 -> `build_memory_graph(snapshot)`
 -> `GraphStore.replace_graph(...)`
 -> `MemoryDocumentProjector.project(snapshot)`
@@ -88,7 +99,7 @@ Resultat:
 
 `query`
 -> `SemanticIndex.search(...)`
--> hydration par `PersonalMemoryGraph`
+-> hydration batch par `PersonalMemoryGraph` (une passe) ou batch Neo4j cible
 -> scoring clinique explicable (`score_breakdown`)
 -> `MemoryRecall`
 -> `PatientReorientationContext`
@@ -101,6 +112,59 @@ Notes d'integration:
 
 - les backends externes peuvent etre fermes via `close()`
 - `MemorySyncEngine` supporte aussi `with ... as engine:` pour fermer proprement ses backends
+
+## Reprise apres crash (WAL)
+
+Le moteur supporte un journal de transactions avec deux implementations:
+
+- `InMemoryTransactionLog`: utile en tests/unitaires
+- `JsonlTransactionLog`: WAL durable sur disque (reprise apres restart process)
+
+Usage recommande en production:
+
+```python
+from memento.memory import JsonlTransactionLog, MemorySyncEngine
+
+engine = MemorySyncEngine(
+	transaction_log=JsonlTransactionLog(path="/var/lib/memento/memory-wal.jsonl"),
+	auto_recover=True,
+)
+```
+
+Au demarrage, `auto_recover=True` rejoue les transactions `prepared/graph_written/index_written`
+jusqu'au commit, pour remettre graphe et index dans un etat coherent.
+
+## Adaptation emotionnelle temps reel
+
+Le moteur accepte un contexte emotionnel direct (`emotional_state`) ou le detecte via
+`RuleBasedEmotionalStateDetector` si aucun contexte n'est fourni.
+
+Ce signal ajuste dynamiquement les poids cliniques:
+
+- agitation/confusion: plus de poids sur routines et anchors
+- tristesse: plus de poids sur proches de confiance et affectif
+- contexte calme: leger renforcement du signal semantique/recence
+
+Le profil actif et les signaux appliques sont exposes dans:
+
+- `hit.score_breakdown.weight_profile`
+- `hit.score_breakdown.weight_signals`
+
+Cette interface est prete a etre branchee sur un detecteur acoustique temps reel.
+
+## Obsolescence et archivage
+
+Les routines et souvenirs supportent:
+
+- `last_validated_on`: date de derniere validation par les aidants
+- `archived_on`: date d'archivage sans suppression
+
+Comportement en lecture:
+
+- archives exclus par defaut (`include_archived=False`)
+- archives inclus sur demande (`include_archived=True`)
+- penalty de stale applique via `staleness_penalty`
+- compteur `MemoryRecall.archived_filtered_hits` pour la traçabilite
 
 ## Contexte de reorientation (knowledge graph)
 

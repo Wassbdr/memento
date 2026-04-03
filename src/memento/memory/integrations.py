@@ -114,6 +114,114 @@ class Neo4jGraphStore:
             )
         return PersonalMemoryGraph(nodes=nodes, relations=relations)
 
+    def batch_recall_context(
+        self,
+        *,
+        patient_id: str,
+        source_node_ids: tuple[str, ...],
+    ) -> dict[str, object]:
+        """Load patient relevance + source contexts for many node IDs with bounded queries."""
+
+        source_references = _parse_source_references(source_node_ids)
+
+        with self._driver.session(database=self._database) as session:
+            patient_record = session.run(
+                _LOAD_PATIENT_RECALL_CONTEXT_QUERY,
+                patient_id=patient_id,
+                trusted_threshold=0.75,
+            ).single()
+            if patient_record is None:
+                return {
+                    "patient_found": False,
+                    "anchor_terms": (),
+                    "trusted_people": (),
+                    "contexts": {},
+                }
+
+            anchors = _as_clean_string_tuple(patient_record.get("anchors"))
+            trusted_people = tuple(
+                sorted(
+                    {
+                        person_name.strip().lower()
+                        for person_name in _as_clean_string_tuple(patient_record.get("trusted_people"))
+                        if person_name.strip()
+                    }
+                )
+            )
+
+            contexts: dict[str, dict[str, object]] = {}
+            if source_references:
+                records = list(
+                    session.run(
+                        _BATCH_RECALL_CONTEXT_QUERY,
+                        patient_id=patient_id,
+                        sources=source_references,
+                    )
+                )
+                for record in records:
+                    source_node_id = str(record.get("source_node_id", "")).strip()
+                    if not source_node_id:
+                        continue
+
+                    source_label = str(record.get("source_label", "Unknown"))
+                    source_properties = dict(record.get("source_properties", {}) or {})
+                    neighbors_payload = record.get("neighbors") or []
+
+                    related_people: set[str] = set()
+                    related_places: set[str] = set()
+                    related_emotions: set[str] = set()
+                    related_routines: set[str] = set()
+                    related_episodes: set[str] = set()
+                    emotion_intensities: list[float] = []
+
+                    if isinstance(neighbors_payload, list):
+                        for payload in neighbors_payload:
+                            if not isinstance(payload, dict):
+                                continue
+                            label = str(payload.get("label", ""))
+                            display_name = str(payload.get("display_name", "")).strip()
+                            if not display_name:
+                                continue
+                            if label == "Person":
+                                related_people.add(display_name)
+                            elif label == "Place":
+                                related_places.add(display_name)
+                            elif label == "Emotion":
+                                related_emotions.add(display_name)
+                                raw_intensity = payload.get("intensity")
+                                try:
+                                    intensity = float(raw_intensity)
+                                except (TypeError, ValueError):
+                                    intensity = None
+                                if intensity is not None:
+                                    emotion_intensities.append(max(0.0, min(1.0, intensity)))
+                            elif label == "Routine":
+                                related_routines.add(display_name)
+                            elif label == "Episode":
+                                related_episodes.add(display_name)
+
+                    contexts[source_node_id] = {
+                        "source_label": source_label,
+                        "source_display_name": _display_name_from_properties(
+                            source_properties,
+                            fallback=source_node_id,
+                        ),
+                        "source_properties": source_properties,
+                        "related_people": tuple(sorted(related_people)),
+                        "related_places": tuple(sorted(related_places)),
+                        "related_emotions": tuple(sorted(related_emotions)),
+                        "related_routines": tuple(sorted(related_routines)),
+                        "related_episodes": tuple(sorted(related_episodes)),
+                        "emotion_intensities": tuple(emotion_intensities),
+                    }
+
+        return {
+            "patient_found": True,
+            "anchor_terms": anchors,
+            "trusted_people": trusted_people,
+            "contexts": contexts,
+        }
+
     def _replace_snapshot_tx(
         self,
         tx: Any,
@@ -324,6 +432,48 @@ RETURN
 """
 
 
+_LOAD_PATIENT_RECALL_CONTEXT_QUERY = """
+MATCH (patient:Patient {patient_id: $patient_id})
+OPTIONAL MATCH (patient)-[:KNOWS]->(trusted:Person)
+RETURN
+    patient.patient_id AS patient_id,
+    patient.anchors AS anchors,
+    [
+        person IN collect(trusted)
+        WHERE coalesce(person.emotional_significance, 0.0) >= $trusted_threshold
+        | toLower(coalesce(person.name, ""))
+    ] AS trusted_people
+"""
+
+
+_BATCH_RECALL_CONTEXT_QUERY = """
+UNWIND $sources AS source_ref
+MATCH (source {patient_id: $patient_id, id: source_ref.id})
+WHERE source_ref.label IN labels(source)
+OPTIONAL MATCH (source)-[]-(neighbor {patient_id: $patient_id})
+WITH source, collect(DISTINCT neighbor) AS neighbors
+RETURN
+    toLower(head(labels(source))) + ':' + toString(source.id) AS source_node_id,
+    head(labels(source)) AS source_label,
+    properties(source) AS source_properties,
+    [
+        neighbor IN neighbors |
+        {
+            label: head(labels(neighbor)),
+            display_name: coalesce(
+                neighbor.display_name,
+                neighbor.preferred_name,
+                neighbor.name,
+                neighbor.title,
+                neighbor.label,
+                toString(neighbor.id)
+            ),
+            intensity: neighbor.intensity
+        }
+    ] AS neighbors
+"""
+
+
 def _iter_cypher_statements(cypher: str) -> Iterable[str]:
     for line in cypher.splitlines():
         statement = line.strip()
@@ -430,3 +580,52 @@ def _chroma_where_clause(
     if len(filters) == 1:
         return filters[0]
     return {"$and": filters}
+
+
+def _parse_source_references(source_node_ids: tuple[str, ...]) -> tuple[dict[str, str], ...]:
+    unique: dict[tuple[str, str], dict[str, str]] = {}
+    for source_node_id in source_node_ids:
+        text = str(source_node_id).strip()
+        if not text or ":" not in text:
+            continue
+        prefix, entity_id = text.split(":", 1)
+        label = _node_label_from_prefix(prefix)
+        key = (label, entity_id)
+        unique[key] = {"label": label, "id": entity_id}
+    return tuple(
+        unique[key]
+        for key in sorted(unique.keys())
+    )
+
+
+def _node_label_from_prefix(prefix: str) -> str:
+    normalized = prefix.strip().lower()
+    mapping = {
+        "patient": "Patient",
+        "person": "Person",
+        "place": "Place",
+        "routine": "Routine",
+        "episode": "Episode",
+        "emotion": "Emotion",
+    }
+    return mapping.get(normalized, normalized.capitalize() or "Unknown")
+
+
+def _display_name_from_properties(properties: dict[str, object], *, fallback: str) -> str:
+    for key in ("display_name", "preferred_name", "name", "title", "label", "id"):
+        value = properties.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return fallback
+
+
+def _as_clean_string_tuple(value: object) -> tuple[str, ...]:
+    if isinstance(value, (list, tuple)):
+        return tuple(
+            text.strip()
+            for text in (str(item) for item in value)
+            if text.strip()
+        )
+    if isinstance(value, str) and value.strip():
+        return (value.strip(),)
+    return ()

@@ -7,6 +7,7 @@ from memento import (
     ConversationGeneration,
     ConversationMessage,
     ConversationOrchestrator,
+    EmotionalState,
     MemorySyncEngine,
 )
 
@@ -155,6 +156,38 @@ def test_conversation_orchestrator_keeps_uncertain_answer_without_forcing_fact()
 
     assert result.answer == "Je ne sais pas qui vient dimanche."
     assert result.trace.guard_applied is False
+
+def test_conversation_orchestrator_forwards_archived_and_emotional_controls(monkeypatch) -> None:
+    engine = MemorySyncEngine()
+    engine.sync_snapshot(build_snapshot())
+    backend = FakeConversationBackend("Claire vient dimanche.")
+    orchestrator = ConversationOrchestrator(memory_engine=engine, backend=backend)
+
+    captured: dict[str, object] = {}
+    original_reorientation_context = engine.reorientation_context
+
+    def capturing_reorientation_context(*args, **kwargs):
+        captured["include_archived"] = kwargs.get("include_archived")
+        captured["emotional_state"] = kwargs.get("emotional_state")
+        return original_reorientation_context(*args, **kwargs)
+
+    monkeypatch.setattr(engine, "reorientation_context", capturing_reorientation_context)
+
+    state = EmotionalState(
+        label="agite",
+        intensity=0.9,
+        confidence=0.95,
+        source="manual",
+    )
+    orchestrator.respond(
+        "rose",
+        "Qui vient dimanche ?",
+        include_archived=True,
+        emotional_state=state,
+    )
+
+    assert captured["include_archived"] is True
+    assert captured["emotional_state"] == state
 
 
 def test_conversation_config_validates_positive_limits() -> None:
