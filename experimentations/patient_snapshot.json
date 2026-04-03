@@ -1,0 +1,21 @@
+{
+  "patient": {
+    "patient_id": "rose",
+    "display_name": "Rose Martin",
+    "preferred_name": "Mamie Rose",
+    "care_notes": ["Rassurer avant de recontextualiser."],
+    "anchors": ["Appartement rue des Lilas"]
+  },
+  "people": [
+    {
+      "person_id": "claire",
+      "name": "Claire Martin",
+      "relationship_to_patient": "sa fille",
+      "notes": "Vient le dimanche.",
+      "emotional_significance": 0.95
+    }
+  ],
+  "places": [],
+  "routines": [],
+  "episodes": []
+}

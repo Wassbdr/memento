@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from memento import (
     ConversationMessage,
     OpenAICompatibleBackendConfig,
@@ -99,3 +101,52 @@ def test_openai_compatible_backend_supports_content_arrays() -> None:
 
     assert generation.text == "Bonjour Rose."
     assert generation.model_name == "Ministral 3 8B"
+
+
+def test_openai_compatible_backend_accepts_full_chat_completions_url() -> None:
+    calls: list[str] = []
+
+    def fake_transport(url: str, payload: bytes, headers: dict[str, str], timeout: float) -> bytes:
+        calls.append(url)
+        return json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {"content": "Bonjour Rose."},
+                    }
+                ]
+            }
+        ).encode("utf-8")
+
+    backend = OpenAICompatibleConversationBackend(
+        config=OpenAICompatibleBackendConfig(
+            base_url="http://localhost:11434/v1/chat/completions",
+        ),
+        transport=fake_transport,
+    )
+
+    backend.generate(
+        (ConversationMessage(role="user", content="Bonjour ?"),),
+        model_name="Ministral 3 8B",
+        temperature=0.0,
+    )
+
+    assert calls == ["http://localhost:11434/v1/chat/completions"]
+
+
+def test_openai_compatible_backend_includes_model_in_transport_errors() -> None:
+    def failing_transport(url: str, payload: bytes, headers: dict[str, str], timeout: float) -> bytes:
+        raise RuntimeError('conversation backend HTTP 400 at http://localhost:11434/v1/chat/completions: {"error":{"message":"model is required"}}')
+
+    backend = OpenAICompatibleConversationBackend(transport=failing_transport)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        backend.generate(
+            (ConversationMessage(role="user", content="Bonjour ?"),),
+            model_name="Ministral 3 8B",
+            temperature=0.0,
+        )
+
+    message = str(excinfo.value)
+    assert "model is required" in message
+    assert "model=Ministral 3 8B" in message

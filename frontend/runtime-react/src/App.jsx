@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+const LEGACY_LLM_MODEL_LABEL = "Ministral 3 8B";
+
 const DEFAULT_SNAPSHOT = {
   patient: {
     patient_id: "rose",
@@ -76,7 +78,7 @@ const DEFAULT_SETTINGS = {
   llmBaseUrl: "http://127.0.0.1:11434/v1",
   llmApiKey: "",
   llmTimeoutSeconds: 60,
-  llmModel: "Ministral 3 8B",
+  llmModel: "",
   temperature: 0.2,
   topK: 3,
   maxPromptMemories: 3,
@@ -100,6 +102,8 @@ function App() {
   const [error, setError] = useState("");
   const [question, setQuestion] = useState("");
   const [health, setHealth] = useState(null);
+  const [llmModels, setLlmModels] = useState([]);
+  const [llmModelsError, setLlmModelsError] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -143,6 +147,58 @@ function App() {
     return () => controller.abort();
   }, [settings.apiBaseUrl]);
 
+  useEffect(() => {
+    const tagsUrl = buildOllamaTagsUrl(settings.llmBaseUrl);
+    if (!tagsUrl) {
+      setLlmModels([]);
+      setLlmModelsError("");
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    async function fetchModels() {
+      try {
+        const response = await fetch(tagsUrl, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const models = extractModelNames(payload);
+        setLlmModels(models);
+        setLlmModelsError("");
+
+        if (models.length > 0) {
+          setSettings((current) => {
+            const normalizedCurrentModel = current.llmModel.trim();
+            if (
+              normalizedCurrentModel &&
+              normalizedCurrentModel !== LEGACY_LLM_MODEL_LABEL
+            ) {
+              return current;
+            }
+            return {
+              ...current,
+              llmModel: models[0],
+            };
+          });
+        }
+      } catch (requestError) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setLlmModels([]);
+        setLlmModelsError(requestError.message || "Impossible de charger les modeles LLM.");
+      }
+    }
+
+    fetchModels();
+    return () => controller.abort();
+  }, [settings.llmBaseUrl]);
+
   async function submitTextTurn() {
     if (!question.trim()) {
       setError("Le message texte est vide.");
@@ -154,6 +210,20 @@ function App() {
   }
 
   async function sendTurn({ mode, userText = "", audioBase64 = "" }) {
+    const normalizedModel = settings.llmModel.trim();
+    if (!normalizedModel) {
+      setError("Choisis un modele LLM exact avant d'envoyer.");
+      setStatus("Configuration incomplete");
+      return;
+    }
+    if (llmModels.length > 0 && !llmModels.includes(normalizedModel)) {
+      setError(
+        `Modele introuvable sur le serveur: ${normalizedModel}. Utilise un identifiant exact comme ${llmModels[0]}.`
+      );
+      setStatus("Configuration invalide");
+      return;
+    }
+
     setIsSending(true);
     setError("");
     setStatus(mode === "voice" ? "Transcription et reponse en cours" : "Generation en cours");
@@ -174,7 +244,7 @@ function App() {
           llmBaseUrl: settings.llmBaseUrl,
           llmApiKey: settings.llmApiKey,
           llmTimeoutSeconds: Number(settings.llmTimeoutSeconds),
-          llmModel: settings.llmModel,
+          llmModel: normalizedModel,
           temperature: Number(settings.temperature),
           topK: Number(settings.topK),
           maxPromptMemories: Number(settings.maxPromptMemories),
@@ -340,9 +410,25 @@ function App() {
           <label className="field">
             <span>Modele LLM</span>
             <input
+              list="llm-model-options"
               value={settings.llmModel}
               onChange={(event) => updateSetting(setSettings, "llmModel", event.target.value)}
+              placeholder={llmModels[0] || "Ex: gemma3:4b"}
             />
+            <datalist id="llm-model-options">
+              {llmModels.map((modelName) => (
+                <option key={modelName} value={modelName} />
+              ))}
+            </datalist>
+            {llmModels.length > 0 ? (
+              <small>
+                Modeles detectes: {llmModels.join(", ")}
+              </small>
+            ) : llmModelsError ? (
+              <small>Detection Ollama indisponible: {llmModelsError}</small>
+            ) : (
+              <small>Utilise l'identifiant exact expose par le serveur LLM.</small>
+            )}
           </label>
           <label className="field">
             <span>Whisper</span>
@@ -371,7 +457,7 @@ function App() {
         <section className="hero-card">
           <div className="hero-copy">
             <p className="eyebrow">Memento React Runtime</p>
-            <h1>Une sphere centrale, sobre, et vivante.</h1>
+            <h1>Memento</h1>
             <p>
               Clique la sphere pour parler a l&apos;assistant. Le navigateur enregistre en WAV,
               l&apos;API Python transcrit avec Whisper, recentre avec la memoire, puis renvoie une
@@ -406,7 +492,7 @@ function App() {
             </div>
             <div className="status-card">
               <span>Modele LLM</span>
-              <strong>{settings.llmModel}</strong>
+              <strong>{settings.llmModel || "A choisir"}</strong>
             </div>
             <div className="status-card">
               <span>Mode</span>
@@ -563,6 +649,30 @@ function updateSetting(setSettings, key, value) {
     ...current,
     [key]: value,
   }));
+}
+
+function buildOllamaTagsUrl(baseUrl) {
+  const normalized = String(baseUrl || "").trim().replace(/\/+$/, "");
+  if (!normalized) {
+    return "";
+  }
+  const withoutChatPath = normalized.replace(/\/chat\/completions$/i, "");
+  const withoutV1 = withoutChatPath.replace(/\/v1$/i, "");
+  return `${withoutV1}/api/tags`;
+}
+
+function extractModelNames(payload) {
+  if (!payload || !Array.isArray(payload.models)) {
+    return [];
+  }
+  return payload.models
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return "";
+      }
+      return String(item.name || item.model || "").trim();
+    })
+    .filter(Boolean);
 }
 
 function formatMetric(value) {

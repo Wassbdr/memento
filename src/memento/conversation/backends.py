@@ -23,14 +23,16 @@ class OpenAICompatibleBackendConfig:
     extra_headers: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
-        normalized_base_url = self.base_url.strip().rstrip("/")
-        if not normalized_base_url:
-            raise ValueError("base_url must not be empty")
         normalized_path = self.chat_completions_path.strip()
         if not normalized_path:
             raise ValueError("chat_completions_path must not be empty")
         if not normalized_path.startswith("/"):
             normalized_path = "/" + normalized_path
+        normalized_base_url = self.base_url.strip().rstrip("/")
+        if normalized_base_url.endswith(normalized_path):
+            normalized_base_url = normalized_base_url[: -len(normalized_path)].rstrip("/")
+        if not normalized_base_url:
+            raise ValueError("base_url must not be empty")
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
 
@@ -84,12 +86,17 @@ class OpenAICompatibleConversationBackend:
             "stream": False,
         }
 
-        raw_response = self._transport(
-            self._chat_completions_url,
-            json.dumps(payload).encode("utf-8"),
-            self._headers(),
-            self._config.timeout_seconds,
-        )
+        try:
+            raw_response = self._transport(
+                self._chat_completions_url,
+                json.dumps(payload).encode("utf-8"),
+                self._headers(),
+                self._config.timeout_seconds,
+            )
+        except RuntimeError as exc:
+            raise RuntimeError(
+                f"{exc} (model={model_name})"
+            ) from exc
         try:
             response_payload = json.loads(raw_response.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -208,7 +215,7 @@ def _default_transport(
     except error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace").strip()
         detail = body or exc.reason
-        raise RuntimeError(f"conversation backend HTTP {exc.code}: {detail}") from exc
+        raise RuntimeError(f"conversation backend HTTP {exc.code} at {url}: {detail}") from exc
     except error.URLError as exc:
         raise RuntimeError(f"conversation backend unavailable at {url}: {exc.reason}") from exc
 
