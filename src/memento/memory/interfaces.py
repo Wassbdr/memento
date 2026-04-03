@@ -2,12 +2,35 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
 
 if TYPE_CHECKING:
     from .graph import PersonalMemoryGraph
     from .models import PatientMemorySnapshot
     from .semantic import MemoryDocument, SemanticSearchHit
+
+
+class BatchRecallNodeContext(TypedDict, total=False):
+    """One source-node context payload returned by batch recall graph backends."""
+
+    source_label: str
+    source_display_name: str
+    source_properties: dict[str, object]
+    related_people: tuple[str, ...]
+    related_places: tuple[str, ...]
+    related_emotions: tuple[str, ...]
+    related_routines: tuple[str, ...]
+    related_episodes: tuple[str, ...]
+    emotion_intensities: tuple[float, ...]
+
+
+class BatchRecallPayload(TypedDict):
+    """Batch graph context payload aligned with sync engine recall expectations."""
+
+    patient_found: bool
+    anchor_terms: tuple[str, ...]
+    trusted_people: tuple[str, ...]
+    contexts: dict[str, BatchRecallNodeContext]
 
 
 class GraphStore(Protocol):
@@ -27,6 +50,19 @@ class GraphStore(Protocol):
 
     def close(self) -> None:
         """Release any underlying resources held by the graph backend."""
+
+
+@runtime_checkable
+class BatchRecallGraphStore(Protocol):
+    """Optional graph-store contract for one-shot candidate context hydration."""
+
+    def batch_recall_context(
+        self,
+        *,
+        patient_id: str,
+        source_node_ids: tuple[str, ...],
+    ) -> BatchRecallPayload:
+        """Load patient and candidate-node contexts in one backend call."""
 
 
 class SemanticIndex(Protocol):

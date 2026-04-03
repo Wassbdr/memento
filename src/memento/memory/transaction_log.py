@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, UTC
 import json
 from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-posix fallback
+    fcntl = None
 
 from .graph import MemoryNode, MemoryRelation, PersonalMemoryGraph
 from .semantic import MemoryDocument
@@ -136,9 +142,16 @@ class InMemoryTransactionLog:
 class JsonlTransactionLog:
     """Durable JSONL write-ahead log for crash recovery across process restarts."""
 
-    def __init__(self, *, path: str | Path) -> None:
+    def __init__(
+        self,
+        *,
+        path: str | Path,
+        compact_threshold_bytes: int = 5_000_000,
+    ) -> None:
         self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock_path = self._path.with_suffix(self._path.suffix + ".lock")
+        self._compact_threshold_bytes = max(compact_threshold_bytes, 0)
 
     @property
     def path(self) -> Path:
@@ -180,7 +193,11 @@ class JsonlTransactionLog:
         self._append_state_event(transaction_id, event="failed", error=error)
 
     def pending_transactions(self) -> tuple[PendingMemoryTransaction, ...]:
-        states = _jsonl_states(self._path)
+        with _advisory_lock(self._lock_path):
+            states = _jsonl_states(self._path)
+            if self._should_compact_locked():
+                _write_states_snapshot(self._path, states)
+
         pending: list[PendingMemoryTransaction] = []
         for transaction_id in sorted(states.keys()):
             state = states[transaction_id]
@@ -208,6 +225,13 @@ class JsonlTransactionLog:
     def close(self) -> None:
         return None
 
+    def compact(self) -> None:
+        """Compact the WAL by keeping only the latest state per transaction."""
+
+        with _advisory_lock(self._lock_path):
+            states = _jsonl_states(self._path)
+            _write_states_snapshot(self._path, states)
+
     def _append_state_event(self, transaction_id: str, *, event: str, error: str = "") -> None:
         payload: dict[str, object] = {
             "event": event,
@@ -219,9 +243,20 @@ class JsonlTransactionLog:
         self._append_event(payload)
 
     def _append_event(self, payload: dict[str, object]) -> None:
-        with self._path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True))
-            handle.write("\n")
+        with _advisory_lock(self._lock_path):
+            with self._path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=True))
+                handle.write("\n")
+            if self._should_compact_locked():
+                states = _jsonl_states(self._path)
+                _write_states_snapshot(self._path, states)
+
+    def _should_compact_locked(self) -> bool:
+        if self._compact_threshold_bytes <= 0:
+            return False
+        if not self._path.exists():
+            return False
+        return self._path.stat().st_size >= self._compact_threshold_bytes
 
 
 def _jsonl_states(path: Path) -> dict[str, dict[str, object]]:
@@ -254,6 +289,16 @@ def _jsonl_states(path: Path) -> dict[str, dict[str, object]]:
             merged.update(event)
             states[transaction_id] = merged
     return states
+
+
+def _write_states_snapshot(path: Path, states: dict[str, dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_suffix(path.suffix + ".tmp")
+    with temporary_path.open("w", encoding="utf-8") as handle:
+        for transaction_id in sorted(states.keys()):
+            handle.write(json.dumps(states[transaction_id], ensure_ascii=True))
+            handle.write("\n")
+    temporary_path.replace(path)
 
 
 def _new_transaction_id() -> str:
@@ -338,3 +383,16 @@ def _deserialize_document(payload: dict[str, object]) -> MemoryDocument:
         text=str(payload.get("text", "")),
         metadata=dict(payload.get("metadata", {})),
     )
+
+
+@contextmanager
+def _advisory_lock(lock_path: Path):
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a", encoding="utf-8") as lock_file:
+        if fcntl is not None:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)

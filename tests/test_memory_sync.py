@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 from datetime import datetime
 
@@ -510,6 +511,31 @@ def test_auto_recover_replays_pending_transactions_on_startup(tmp_path) -> None:
     assert recall.hits
 
 
+def test_jsonl_transaction_log_compacts_to_latest_state_snapshot(tmp_path) -> None:
+    snapshot = build_snapshot()
+    graph = build_memory_graph(snapshot)
+    documents = MemoryDocumentProjector().project(snapshot)
+    wal_path = tmp_path / "memory-wal.jsonl"
+    transaction_log = JsonlTransactionLog(path=wal_path, compact_threshold_bytes=1)
+
+    transaction_id = transaction_log.begin(
+        patient_id="rose",
+        graph=graph,
+        documents=documents,
+    )
+    transaction_log.mark_graph_written(transaction_id)
+    transaction_log.mark_index_written(transaction_id)
+    transaction_log.mark_committed(transaction_id)
+
+    lines = [line for line in wal_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(lines) == 1
+
+    payload = json.loads(lines[0])
+    assert payload["transaction_id"] == transaction_id
+    assert payload["event"] == "committed"
+    assert payload["patient_id"] == "rose"
+
+
 def test_failed_transaction_is_not_left_pending_in_wal() -> None:
     transaction_log = InMemoryTransactionLog()
     graph_store = InMemoryGraphStore()
@@ -794,6 +820,25 @@ class BatchRecallGraphStore(InMemoryGraphStore):
         }
 
 
+class PartialBatchRecallGraphStore(BatchRecallGraphStore):
+    def batch_recall_context(self, *, patient_id: str, source_node_ids: tuple[str, ...]):
+        payload = super().batch_recall_context(
+            patient_id=patient_id,
+            source_node_ids=source_node_ids,
+        )
+        contexts = dict(payload["contexts"])
+        if source_node_ids:
+            contexts.pop(source_node_ids[-1], None)
+        payload["contexts"] = contexts
+        return payload
+
+
+class FailingBatchRecallGraphStore(BatchRecallGraphStore):
+    def batch_recall_context(self, *, patient_id: str, source_node_ids: tuple[str, ...]):
+        self.batch_calls += 1
+        raise RuntimeError("batch backend unavailable")
+
+
 def test_recall_prefers_batch_graph_context_when_available() -> None:
     graph_store = BatchRecallGraphStore()
     engine = MemorySyncEngine(graph_store=graph_store)
@@ -805,3 +850,29 @@ def test_recall_prefers_batch_graph_context_when_available() -> None:
     assert recall.hits
     assert graph_store.batch_calls == 1
     assert graph_store.graph_for_patient_calls == 0
+
+
+def test_recall_falls_back_to_graph_when_batch_context_is_partial() -> None:
+    graph_store = PartialBatchRecallGraphStore()
+    engine = MemorySyncEngine(graph_store=graph_store)
+    engine.sync_snapshot(build_snapshot())
+
+    graph_store.graph_for_patient_calls = 0
+    recall = engine.recall("rose", "dejeuner", top_k=2)
+
+    assert recall.hits
+    assert graph_store.batch_calls == 1
+    assert graph_store.graph_for_patient_calls == 1
+
+
+def test_recall_falls_back_to_graph_when_batch_context_raises() -> None:
+    graph_store = FailingBatchRecallGraphStore()
+    engine = MemorySyncEngine(graph_store=graph_store)
+    engine.sync_snapshot(build_snapshot())
+
+    graph_store.graph_for_patient_calls = 0
+    recall = engine.recall("rose", "dejeuner", top_k=2)
+
+    assert recall.hits
+    assert graph_store.batch_calls == 1
+    assert graph_store.graph_for_patient_calls == 1

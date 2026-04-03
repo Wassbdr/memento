@@ -10,7 +10,7 @@ from .graph import PersonalMemoryGraph, build_memory_graph
 from .graph_store import InMemoryGraphStore
 from .ingestion import reconcile_snapshot
 from .integrity import build_patient_integrity_report, orphan_document_ids
-from .interfaces import GraphStore, SemanticIndex
+from .interfaces import BatchRecallGraphStore, BatchRecallPayload, GraphStore, SemanticIndex
 from .models import PatientMemorySnapshot
 from .recall import RecallNodeContext, build_memory_recall
 from .reorientation import build_reorientation_context
@@ -176,18 +176,19 @@ class MemorySyncEngine:
         if batch_payload is not None:
             if not batch_payload.patient_found:
                 raise ValueError(f"unknown patient_id: {patient_id}")
-            return build_memory_recall(
-                query=query,
-                patient_id=patient_id,
-                graph=None,
-                semantic_hits=semantic_hits,
-                reference_datetime=reference_datetime,
-                include_archived=include_archived,
-                emotional_state=effective_emotional_state,
-                prefetched_contexts=batch_payload.contexts,
-                anchor_terms=batch_payload.anchor_terms,
-                trusted_people=set(batch_payload.trusted_people),
-            )
+            if _batch_payload_is_complete(batch_payload, source_node_ids):
+                return build_memory_recall(
+                    query=query,
+                    patient_id=patient_id,
+                    graph=None,
+                    semantic_hits=semantic_hits,
+                    reference_datetime=reference_datetime,
+                    include_archived=include_archived,
+                    emotional_state=effective_emotional_state,
+                    prefetched_contexts=batch_payload.contexts,
+                    anchor_terms=batch_payload.anchor_terms,
+                    trusted_people=set(batch_payload.trusted_people),
+                )
 
         graph = self._graph_store.graph_for_patient(patient_id)
         if graph is None:
@@ -362,11 +363,17 @@ def _graph_store_batch_recall_payload(
     patient_id: str,
     source_node_ids: tuple[str, ...],
 ) -> _BatchRecallPayload | None:
-    batch_method = getattr(graph_store, "batch_recall_context", None)
-    if not callable(batch_method):
+    if not isinstance(graph_store, BatchRecallGraphStore):
         return None
 
-    payload = batch_method(patient_id=patient_id, source_node_ids=source_node_ids)
+    try:
+        payload: BatchRecallPayload = graph_store.batch_recall_context(
+            patient_id=patient_id,
+            source_node_ids=source_node_ids,
+        )
+    except Exception:
+        return None
+
     if not isinstance(payload, dict):
         return None
 
@@ -400,6 +407,22 @@ def _graph_store_batch_recall_payload(
         anchor_terms=_as_string_tuple(payload.get("anchor_terms")),
         trusted_people=_as_string_tuple(payload.get("trusted_people")),
     )
+
+
+def _batch_payload_is_complete(
+    payload: _BatchRecallPayload,
+    source_node_ids: tuple[str, ...],
+) -> bool:
+    expected_ids = {
+        str(source_node_id).strip()
+        for source_node_id in source_node_ids
+        if str(source_node_id).strip()
+    }
+    if not expected_ids:
+        return True
+
+    available_ids = set(payload.contexts.keys())
+    return expected_ids.issubset(available_ids)
 
 
 def _as_string_tuple(value: object) -> tuple[str, ...]:
