@@ -23,13 +23,19 @@ La memoire suit une logique knowledge graph + recherche semantique.
 
 1. Ingestion:
 - l'application compose un `PatientMemorySnapshot`
+- le snapshot est d'abord normalise/reconcilie (`reconcile_snapshot`) pour traiter doublons et conflits de saisie
 - le snapshot est synchronise via `MemorySyncEngine.sync_snapshot(...)`
-- le moteur met a jour en parallele:
+- le moteur met a jour en parallele, dans une transaction explicite graph/index:
     - le graphe patient (relations explicites)
     - l'index semantique (recuperation contextuelle)
+- chaque transaction peut etre journalisee (WAL JSONL) et rejouee au redemarrage (`auto_recover=True`)
 
 2. Recuperation:
 - `MemorySyncEngine.recall(...)` retrouve des souvenirs pertinents
+- l'hydratation graphe est calculee en passe unique pour limiter la latence quand `top_k` augmente
+- avec `Neo4jGraphStore`, les contextes des candidats sont recuperes en batch (`batch_recall_context`)
+- les souvenirs archives sont filtres par defaut (option `include_archived=True` pour les reinclure)
+- une couche emotionnelle ajuste dynamiquement les poids cliniques (agitation, tristesse, calme)
 - les hits sont reclasses avec un score clinique explicable (`score_breakdown`)
 - `MemorySyncEngine.reorientation_context(...)` produit un contexte de reassurance pret a etre injecte dans la reponse vocale
 
@@ -41,6 +47,7 @@ Voir la documentation detaillee de la couche memory:
 Chemin ecriture:
 
 `PatientMemorySnapshot`
+-> reconciliation d'entree
 -> projection graphe
 -> ecriture `GraphStore`
 -> projection documents
@@ -50,7 +57,7 @@ Chemin lecture:
 
 `question patient`
 -> recherche semantique
--> enrichment par le graphe
+-> enrichment graphe en passe unique
 -> scoring explicable
 -> contexte de reorientation
 -> generation de reponse vocale

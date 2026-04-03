@@ -315,6 +315,8 @@ def build_memory_graph(snapshot: PatientMemorySnapshot) -> PersonalMemoryGraph:
                     "description": routine.description,
                     "cue": routine.cue,
                     "support_strategy": routine.support_strategy,
+                    "last_validated_on": routine.last_validated_on,
+                    "archived_on": routine.archived_on,
                 },
             )
         )
@@ -372,6 +374,8 @@ def _append_episode(
                 "title": episode.title,
                 "narrative": episode.narrative,
                 "happened_on": episode.happened_on,
+                "last_validated_on": episode.last_validated_on,
+                "archived_on": episode.archived_on,
                 "tags": list(episode.tags),
             },
         )

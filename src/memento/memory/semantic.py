@@ -232,12 +232,16 @@ class MemoryDocumentProjector:
                         f"Description {routine.description}. "
                         f"Signal {routine.cue or 'aucun'}. "
                         f"Strategie d'accompagnement {routine.support_strategy or 'aucune'}. "
+                        f"Derniere validation {routine.last_validated_on or 'inconnue'}. "
+                        f"Archive le {routine.archived_on or 'non archive'}. "
                         f"Lieu {place_name}."
                     ),
                     metadata={
                         "patient_id": patient.patient_id,
                         "source_label": "Routine",
                         "schedule": routine.schedule,
+                        "last_validated_on": routine.last_validated_on,
+                        "archived_on": routine.archived_on,
                     },
                 )
             )
@@ -258,12 +262,16 @@ class MemoryDocumentProjector:
                         f"Personnes {'; '.join(people_names) if people_names else 'aucune personne precisee'}. "
                         f"Lieu {place_name}. "
                         f"Emotions {'; '.join(emotion_names) if emotion_names else 'aucune emotion precisee'}. "
+                        f"Derniere validation {episode.last_validated_on or 'inconnue'}. "
+                        f"Archive le {episode.archived_on or 'non archive'}. "
                         f"Tags {'; '.join(episode.tags) if episode.tags else 'aucun tag'}."
                     ),
                     metadata={
                         "patient_id": patient.patient_id,
                         "source_label": "Episode",
                         "happened_on": episode.happened_on,
+                        "last_validated_on": episode.last_validated_on,
+                        "archived_on": episode.archived_on,
                     },
                 )
             )

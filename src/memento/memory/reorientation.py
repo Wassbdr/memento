@@ -22,6 +22,7 @@ def build_reorientation_context(
     trusted_people_limit: int,
     routines_limit: int,
     reference_datetime: datetime | None = None,
+    include_archived: bool = False,
 ) -> PatientReorientationContext:
     """Build one reorientation context from graph entities and recall evidence."""
 
@@ -41,6 +42,7 @@ def build_reorientation_context(
         patient_node.node_id,
         limit=routines_limit,
         reference_datetime=effective_datetime,
+        include_archived=include_archived,
     )
 
     return PatientReorientationContext(
@@ -105,6 +107,7 @@ def _routines_for_patient(
     *,
     limit: int,
     reference_datetime: datetime,
+    include_archived: bool,
 ) -> tuple[RoutineSupportContext, ...]:
     routines: list[RoutineSupportContext] = []
 
@@ -117,6 +120,8 @@ def _routines_for_patient(
         routine_node = neighbor.node
         place_name = _routine_place_name(graph, routine_node.node_id)
         properties = routine_node.properties
+        if not include_archived and _as_clean_string(properties.get("archived_on")):
+            continue
         schedule = _as_clean_string(properties.get("schedule"))
         minutes_until = minutes_until_next_occurrence(
             schedule,

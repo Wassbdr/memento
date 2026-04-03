@@ -16,10 +16,35 @@ class MemoryScoreBreakdown:
     routine_time_bonus: float
     recency_bonus: float
     anchor_bonus: float
+    staleness_penalty: float
     final_score: float
     routine_minutes_until: int | None = None
     episode_recency_days: int | None = None
+    validation_recency_days: int | None = None
+    weight_profile: str = "baseline"
+    weight_signals: tuple[str, ...] = ()
     signals: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class MemoryIngestionIssue:
+    """One conflict or reconciliation action detected during ingestion."""
+
+    issue_type: str
+    entity_ids: tuple[str, ...]
+    detail: str
+    resolution: str
+
+
+@dataclass(frozen=True)
+class MemoryIngestionReport:
+    """Summary of normalization and conflict handling before synchronization."""
+
+    merged_people: int = 0
+    merged_places: int = 0
+    merged_routines: int = 0
+    merged_episodes: int = 0
+    issues: tuple[MemoryIngestionIssue, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -31,6 +56,17 @@ class MemorySyncReport:
     graph_relations_written: int
     indexed_documents: int
     deleted_documents: int
+    ingestion_report: MemoryIngestionReport | None = None
+
+
+@dataclass(frozen=True)
+class MemoryTransactionReport:
+    """Operational outcome of one graph/index synchronized transaction."""
+
+    patient_id: str
+    graph_written: bool
+    index_written: bool
+    rollback_performed: bool
 
 
 @dataclass(frozen=True)
@@ -60,6 +96,7 @@ class MemoryRecall:
     hits: tuple[MemoryContextHit, ...]
     dropped_hits: int = 0
     total_semantic_hits: int = 0
+    archived_filtered_hits: int = 0
 
 
 @dataclass(frozen=True)

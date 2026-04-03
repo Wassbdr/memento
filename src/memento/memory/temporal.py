@@ -73,6 +73,22 @@ def recency_bonus(days_since: int | None) -> float:
     return 0.01
 
 
+def validation_staleness_penalty(days_since_validation: int | None) -> float:
+    """Return a penalty for entities not revalidated for a long time."""
+
+    if days_since_validation is None:
+        return 0.0
+    if days_since_validation <= 30:
+        return 0.0
+    if days_since_validation <= 180:
+        return 0.03
+    if days_since_validation <= 365:
+        return 0.08
+    if days_since_validation <= 730:
+        return 0.14
+    return 0.2
+
+
 def _extract_hour_minute(schedule: str) -> tuple[int, int] | None:
     match = _TIME_PATTERN.search(schedule)
     if match is None:
