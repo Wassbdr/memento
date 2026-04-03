@@ -1,0 +1,557 @@
+:root {
+  color-scheme: dark;
+  --bg-0: #030406;
+  --bg-1: #08111c;
+  --panel: rgba(9, 14, 22, 0.86);
+  --panel-2: rgba(10, 17, 28, 0.72);
+  --line: rgba(122, 155, 255, 0.18);
+  --text: #f5f7ff;
+  --muted: #97a7c6;
+  --blue: #4b7cff;
+  --cyan: #74ebff;
+  --pink: #ff5e97;
+  --amber: #ffc06b;
+  font-family: "IBM Plex Sans", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(75, 124, 255, 0.2), transparent 32%),
+    radial-gradient(circle at top right, rgba(255, 94, 151, 0.18), transparent 28%),
+    radial-gradient(circle at bottom center, rgba(116, 235, 255, 0.1), transparent 30%),
+    linear-gradient(180deg, #020305, #060911 44%, #020305);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  color: var(--text);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.config-panel {
+  padding: 1.5rem;
+  border-right: 1px solid var(--line);
+  background: rgba(4, 8, 14, 0.84);
+  backdrop-filter: blur(18px);
+  overflow: auto;
+}
+
+.main-panel {
+  padding: 1.5rem;
+}
+
+.hero-card,
+.composer-card,
+.conversation-panel,
+.patient-panel {
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(9, 15, 24, 0.88), rgba(7, 12, 19, 0.74));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+}
+
+.hero-card {
+  padding: 1.4rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-card::before {
+  content: "";
+  position: absolute;
+  inset: -10% 48% 56% -12%;
+  background: radial-gradient(circle, rgba(75, 124, 255, 0.24), transparent 60%);
+  filter: blur(24px);
+}
+
+.hero-card::after {
+  content: "";
+  position: absolute;
+  inset: 58% -8% -18% 44%;
+  background: radial-gradient(circle, rgba(255, 94, 151, 0.16), transparent 60%);
+  filter: blur(28px);
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #def7ff;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.74rem;
+}
+
+.hero-copy h1,
+.panel-header h2,
+.composer-header h2 {
+  margin: 0.6rem 0 0.5rem;
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.05em;
+}
+
+.hero-copy h1 {
+  max-width: 12ch;
+  font-size: clamp(2.4rem, 5vw, 4.9rem);
+  line-height: 0.92;
+}
+
+.hero-copy p:last-child,
+.composer-header p {
+  max-width: 54rem;
+  color: var(--muted);
+}
+
+.orb-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0 1.4rem;
+}
+
+.orb-button {
+  position: relative;
+  width: min(56vw, 390px);
+  aspect-ratio: 1;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+  transition: transform 180ms ease;
+}
+
+.orb-button:hover {
+  transform: scale(1.015);
+}
+
+.orb-button:disabled {
+  cursor: wait;
+}
+
+.orb-ring,
+.orb-core,
+.orb-spectrum,
+.orb-content {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.orb-ring-a {
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(75, 124, 255, 0.22),
+      rgba(116, 235, 255, 0.98),
+      rgba(255, 192, 107, 0.28),
+      rgba(255, 94, 151, 0.96),
+      rgba(75, 124, 255, 0.22)
+    );
+  filter: blur(20px);
+  animation: spin 12s linear infinite;
+}
+
+.orb-ring-b {
+  inset: 8%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 0 22px rgba(255, 255, 255, 0.06),
+    0 0 28px rgba(116, 235, 255, 0.12);
+}
+
+.orb-spectrum {
+  background:
+    radial-gradient(circle, transparent 0 59%, #fff 60% 68%, transparent 69%),
+    repeating-conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0.92) 0deg 1deg,
+      transparent 1deg 6deg
+    );
+  mask: radial-gradient(circle, transparent 0 57%, #fff 58% 72%, transparent 73%);
+  opacity: 0.62;
+  animation: pulse 3.2s ease-in-out infinite;
+}
+
+.orb-core {
+  inset: 14%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.1), transparent 15%),
+    radial-gradient(circle at 66% 42%, rgba(75, 124, 255, 0.13), transparent 26%),
+    radial-gradient(circle at 50% 50%, rgba(11, 15, 24, 0.82), rgba(1, 2, 4, 0.98) 74%);
+  box-shadow:
+    inset 0 0 72px rgba(0, 0, 0, 0.78),
+    inset 0 0 16px rgba(116, 235, 255, 0.08),
+    0 0 50px rgba(75, 124, 255, 0.1);
+}
+
+.orb-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  z-index: 2;
+  inset: 18%;
+}
+
+.orb-content strong {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.orb-content small {
+  max-width: 11rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.orb-button.is-recording .orb-ring-a {
+  animation-duration: 2.1s;
+}
+
+.orb-button.is-recording .orb-spectrum {
+  opacity: 0.92;
+  transform: scale(1.04);
+}
+
+.orb-button.is-busy .orb-core {
+  box-shadow:
+    inset 0 0 72px rgba(0, 0, 0, 0.78),
+    inset 0 0 24px rgba(255, 192, 107, 0.08),
+    0 0 54px rgba(255, 94, 151, 0.12);
+}
+
+.status-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.status-card,
+.patient-card,
+.turn-card,
+.field,
+.list-block,
+.empty-state,
+.error-banner {
+  background: rgba(7, 12, 20, 0.72);
+  border: 1px solid rgba(122, 155, 255, 0.14);
+}
+
+.status-card {
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+}
+
+.status-card span,
+.patient-card span,
+.metrics-row span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.status-card strong,
+.patient-card strong,
+.metrics-row strong {
+  display: block;
+  margin-top: 0.35rem;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.composer-card,
+.conversation-panel,
+.patient-panel {
+  padding: 1.2rem;
+  margin-top: 1.2rem;
+}
+
+.composer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  gap: 0.8rem;
+}
+
+.composer-input,
+.field input,
+.field textarea {
+  width: 100%;
+  border: 1px solid rgba(122, 155, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(7, 12, 20, 0.9);
+  color: var(--text);
+  padding: 0.9rem 1rem;
+  outline: none;
+}
+
+.field {
+  display: block;
+  border-radius: 22px;
+  padding: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+.field span {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.field textarea {
+  min-height: 14rem;
+  resize: vertical;
+}
+
+.field-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.button-row {
+  margin-top: 1rem;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 3rem;
+  border-radius: 999px;
+  padding: 0.8rem 1.1rem;
+  border: 1px solid rgba(116, 235, 255, 0.16);
+  color: var(--text);
+}
+
+.primary-button {
+  background: linear-gradient(135deg, rgba(75, 124, 255, 0.28), rgba(255, 94, 151, 0.18));
+}
+
+.secondary-button {
+  background: rgba(10, 17, 28, 0.88);
+}
+
+.error-banner,
+.empty-state,
+.list-block,
+.patient-card,
+.turn-card {
+  border-radius: 22px;
+}
+
+.error-banner {
+  margin-top: 0.85rem;
+  padding: 0.9rem 1rem;
+  color: #ffd9e5;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.9fr);
+  gap: 1.2rem;
+  margin-top: 1.2rem;
+}
+
+.turn-card {
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.bubble {
+  border-radius: 20px;
+  padding: 1rem;
+}
+
+.bubble.user {
+  background: rgba(116, 235, 255, 0.08);
+  border: 1px solid rgba(116, 235, 255, 0.14);
+}
+
+.bubble.assistant {
+  margin-top: 0.8rem;
+  background: rgba(255, 94, 151, 0.08);
+  border: 1px solid rgba(255, 94, 151, 0.14);
+}
+
+.bubble-label {
+  display: inline-flex;
+  margin-bottom: 0.7rem;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bubble p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.95rem;
+}
+
+.metrics-row > div {
+  padding: 0.75rem 0.85rem;
+  border-radius: 18px;
+  background: rgba(5, 10, 16, 0.72);
+  border: 1px solid rgba(122, 155, 255, 0.1);
+}
+
+.turn-card audio {
+  width: 100%;
+  margin-top: 0.95rem;
+}
+
+.memory-zone {
+  margin-top: 0.95rem;
+}
+
+.memory-title {
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.memory-chip-row,
+.list-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.memory-chip,
+.line-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 155, 255, 0.16);
+  background: rgba(75, 124, 255, 0.08);
+  font-size: 0.84rem;
+}
+
+.memory-chip.muted {
+  color: var(--muted);
+}
+
+.inline-warning {
+  margin: 0.85rem 0 0;
+  color: #ffd5e1;
+}
+
+.patient-card {
+  padding: 0.95rem 1rem;
+  margin-top: 0.85rem;
+}
+
+.list-block {
+  padding: 0.95rem;
+  margin-top: 0.9rem;
+}
+
+.list-block p {
+  width: 100%;
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.76rem;
+}
+
+.empty-state {
+  padding: 1rem;
+  margin-top: 1rem;
+  color: var(--muted);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.985);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 0.88;
+  }
+}
+
+@media (max-width: 1100px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .config-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .main-panel,
+  .config-panel {
+    padding: 1rem;
+  }
+
+  .hero-copy h1 {
+    font-size: 2.6rem;
+  }
+
+  .status-grid,
+  .metrics-row,
+  .composer-row {
+    grid-template-columns: 1fr;
+  }
+}

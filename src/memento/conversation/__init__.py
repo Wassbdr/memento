@@ -1,5 +1,9 @@
 """Conversation orchestration building blocks."""
 
+from .backends import (
+    OpenAICompatibleBackendConfig,
+    OpenAICompatibleConversationBackend,
+)
 from .generation import (
     DEFAULT_MINISTRAL_MODEL_NAME,
     SUPPORTED_CONVERSATION_ROLES,
@@ -27,5 +31,7 @@ __all__ = [
     "ConversationOrchestrator",
     "ConversationResponse",
     "ConversationTrace",
+    "OpenAICompatibleBackendConfig",
+    "OpenAICompatibleConversationBackend",
     "RetrievedMemoryEvidence",
 ]

@@ -13,6 +13,7 @@ uv.lock
 build/
 develop-eggs/
 dist/
+node_modules/
 downloads/
 eggs/
 .eggs/

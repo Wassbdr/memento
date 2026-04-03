@@ -115,6 +115,11 @@ class VoiceResponsePipeline:
             meets_targets=meets_targets,
         )
 
+    def stop(self) -> bool | None:
+        """Interrupt the current playback when supported by the output device."""
+
+        return self._player.stop()
+
 
 def _compute_realtime_factor(
     *,

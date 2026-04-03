@@ -132,9 +132,37 @@ def test_conversation_orchestrator_validates_inputs_and_can_close_backend() -> N
     assert backend.closed is True
 
 
+def test_conversation_orchestrator_replaces_unsupported_factual_answer_with_fallback() -> None:
+    engine = MemorySyncEngine()
+    engine.sync_snapshot(build_snapshot())
+    backend = FakeConversationBackend("Paul vient dimanche.")
+    orchestrator = ConversationOrchestrator(memory_engine=engine, backend=backend)
+
+    result = orchestrator.respond("rose", "Qui vient dimanche ?")
+
+    assert result.answer == orchestrator.config.fallback_answer
+    assert result.trace.guard_applied is True
+    assert result.trace.guard_reason == "unsupported_factual_tokens"
+
+
+def test_conversation_orchestrator_keeps_uncertain_answer_without_forcing_fact() -> None:
+    engine = MemorySyncEngine()
+    engine.sync_snapshot(build_snapshot())
+    backend = FakeConversationBackend("Je ne sais pas qui vient dimanche.")
+    orchestrator = ConversationOrchestrator(memory_engine=engine, backend=backend)
+
+    result = orchestrator.respond("rose", "Qui vient dimanche ?")
+
+    assert result.answer == "Je ne sais pas qui vient dimanche."
+    assert result.trace.guard_applied is False
+
+
 def test_conversation_config_validates_positive_limits() -> None:
     with pytest.raises(ValueError, match="max_prompt_memories"):
         ConversationConfig(max_prompt_memories=0)
 
     with pytest.raises(ValueError, match="temperature"):
         ConversationConfig(temperature=2.1)
+
+    with pytest.raises(ValueError, match="fallback_answer"):
+        ConversationConfig(fallback_answer="   ")

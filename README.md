@@ -120,6 +120,97 @@ print(response.context.patient_display_name)
 print(response.trace.retrieved_memories)
 ```
 
+## Runtime bout-en-bout
+
+Le depot contient maintenant un runtime live qui chaine:
+
+`micro -> VAD streaming -> Whisper -> memory -> LLM -> Qwen TTS -> speaker`
+
+Pieces ajoutees:
+
+- backend LLM HTTP compatible OpenAI:
+  - `OpenAICompatibleConversationBackend`
+- runtime live:
+  - `MementoRuntime`
+- bootstrap depuis un snapshot JSON:
+  - `python -m memento.runtime`
+
+Le backend conversationnel vise un endpoint compatible `/v1/chat/completions`
+(par exemple un serveur local expose en mode OpenAI-compatible).
+
+Exemple minimal de snapshot JSON:
+
+```json
+{
+  "patient": {
+    "patient_id": "rose",
+    "display_name": "Rose Martin",
+    "preferred_name": "Mamie Rose",
+    "care_notes": ["Rassurer avant de recontextualiser."],
+    "anchors": ["Appartement rue des Lilas"]
+  },
+  "people": [
+    {
+      "person_id": "claire",
+      "name": "Claire Martin",
+      "relationship_to_patient": "sa fille",
+      "notes": "Vient le dimanche.",
+      "emotional_significance": 0.95
+    }
+  ],
+  "places": [],
+  "routines": [],
+  "episodes": []
+}
+```
+
+Lancement du runtime:
+
+```bash
+uv run python -m memento.runtime \
+  --snapshot-file ./patient_snapshot.json \
+  --llm-base-url http://127.0.0.1:11434/v1 \
+  --llm-model "Ministral 3 8B"
+```
+
+Options utiles:
+
+- `--microphone-device`
+- `--speaker-device`
+- `--whisper-device cpu|cuda`
+- `--tts-speaker`
+- `--disable-interrupt-on-speech`
+- `--max-frames` pour un smoke test court
+
+## Front runtime React
+
+Le runtime dispose maintenant d'un front React avec une grande sphere centrale, une capture micro navigateur, un fallback texte, et une integration HTTP vers le pipeline Python.
+
+Lancer l'API runtime :
+
+```bash
+uv run python -m memento.runtime.web \
+  --snapshot-file ./patient_snapshot.json \
+  --host 127.0.0.1 \
+  --port 8000
+```
+
+Lancer le front React :
+
+```bash
+cd frontend/runtime-react
+npm install
+npm run dev
+```
+
+Le front permet de regler :
+
+- l'URL de l'API runtime
+- le snapshot patient JSON
+- l'endpoint LLM compatible OpenAI
+- le modele Whisper
+- la configuration Qwen TTS
+
 ## Comment tester
 
 ### Installer l'environnement

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import re
 from time import perf_counter
 
 from memento.memory import MemorySyncEngine, PatientReorientationContext
@@ -37,6 +38,11 @@ class ConversationConfig:
     routines_limit: int = 3
     max_prompt_memories: int = 3
     system_instruction: str = DEFAULT_CONVERSATION_SYSTEM_INSTRUCTION
+    enforce_grounded_answers: bool = True
+    fallback_answer: str = (
+        "Je n'ai pas assez d'informations fiables pour repondre a cela. "
+        "Je peux vous rappeler un repere rassurant si vous voulez."
+    )
 
     def __post_init__(self) -> None:
         normalized_model_name = self.model_name.strip()
@@ -46,6 +52,9 @@ class ConversationConfig:
         normalized_instruction = self.system_instruction.strip()
         if not normalized_instruction:
             raise ValueError("system_instruction must not be empty")
+        normalized_fallback_answer = self.fallback_answer.strip()
+        if not normalized_fallback_answer:
+            raise ValueError("fallback_answer must not be empty")
 
         if not 0.0 <= self.temperature <= 2.0:
             raise ValueError("temperature must be between 0.0 and 2.0")
@@ -60,6 +69,7 @@ class ConversationConfig:
 
         object.__setattr__(self, "model_name", normalized_model_name)
         object.__setattr__(self, "system_instruction", normalized_instruction)
+        object.__setattr__(self, "fallback_answer", normalized_fallback_answer)
 
 
 @dataclass(frozen=True)
@@ -89,6 +99,8 @@ class ConversationTrace:
     retrieved_memories: tuple[RetrievedMemoryEvidence, ...]
     dropped_hits: int
     total_semantic_hits: int
+    guard_applied: bool = False
+    guard_reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -101,6 +113,13 @@ class ConversationResponse:
     generation: ConversationGeneration
     trace: ConversationTrace
     context: PatientReorientationContext
+
+
+@dataclass(frozen=True)
+class _AnswerGuardDecision:
+    text: str
+    applied: bool = False
+    reason: str = ""
 
 
 class ConversationOrchestrator:
@@ -180,6 +199,21 @@ class ConversationOrchestrator:
                 prompt_tokens=generation.prompt_tokens,
                 completion_tokens=generation.completion_tokens,
             )
+        guard_decision = _guard_generation_answer(
+            generation=generation,
+            context=context,
+            question=normalized_question,
+            config=self._config,
+        )
+        if guard_decision.applied:
+            generation = ConversationGeneration(
+                text=guard_decision.text,
+                model_name=generation.model_name,
+                latency_ms=generation.latency_ms,
+                finish_reason=generation.finish_reason,
+                prompt_tokens=generation.prompt_tokens,
+                completion_tokens=generation.completion_tokens,
+            )
 
         trace = ConversationTrace(
             system_prompt=system_prompt,
@@ -188,6 +222,8 @@ class ConversationOrchestrator:
             retrieved_memories=_retrieved_memories(context, self._config.max_prompt_memories),
             dropped_hits=context.memory_recall.dropped_hits,
             total_semantic_hits=context.memory_recall.total_semantic_hits,
+            guard_applied=guard_decision.applied,
+            guard_reason=guard_decision.reason,
         )
         return ConversationResponse(
             patient_id=normalized_patient_id,
@@ -346,3 +382,156 @@ def _retrieved_memories(
             )
         )
     return tuple(evidences)
+
+
+_SUPPORTED_FINISH_REASONS = {"", "stop"}
+_COMMON_NON_FACT_TOKENS = {
+    "alors",
+    "avec",
+    "avoir",
+    "bien",
+    "bonjour",
+    "calme",
+    "chez",
+    "comment",
+    "dans",
+    "doucement",
+    "etes",
+    "etre",
+    "falloir",
+    "merci",
+    "peux",
+    "pouvez",
+    "pour",
+    "restez",
+    "suis",
+    "toujours",
+    "votre",
+    "voulez",
+    "vous",
+}
+_UNCERTAINTY_MARKERS = (
+    "je n'ai pas assez d'informations",
+    "je n'ai pas assez d'information",
+    "je ne peux pas confirmer",
+    "je ne sais pas",
+    "je ne suis pas sure",
+    "je ne suis pas certain",
+)
+
+
+def _guard_generation_answer(
+    *,
+    generation: ConversationGeneration,
+    context: PatientReorientationContext,
+    question: str,
+    config: ConversationConfig,
+) -> _AnswerGuardDecision:
+    normalized_finish_reason = generation.finish_reason.strip().lower()
+    if normalized_finish_reason not in _SUPPORTED_FINISH_REASONS:
+        return _AnswerGuardDecision(
+            text=config.fallback_answer,
+            applied=True,
+            reason="unsupported_finish_reason",
+        )
+
+    if not config.enforce_grounded_answers:
+        return _AnswerGuardDecision(text=generation.text)
+
+    normalized_answer = generation.text.strip()
+    if _contains_uncertainty_marker(normalized_answer):
+        return _AnswerGuardDecision(text=normalized_answer)
+
+    candidate_tokens = _candidate_fact_tokens(normalized_answer)
+    if not candidate_tokens:
+        return _AnswerGuardDecision(text=normalized_answer)
+
+    allowed_tokens = _allowed_grounding_tokens(context, question)
+    unsupported_tokens = candidate_tokens - allowed_tokens
+    if unsupported_tokens:
+        return _AnswerGuardDecision(
+            text=config.fallback_answer,
+            applied=True,
+            reason="unsupported_factual_tokens",
+        )
+
+    if not context.memory_recall.hits:
+        return _AnswerGuardDecision(
+            text=config.fallback_answer,
+            applied=True,
+            reason="missing_memory_evidence",
+        )
+
+    return _AnswerGuardDecision(text=normalized_answer)
+
+
+def _contains_uncertainty_marker(text: str) -> bool:
+    normalized = text.strip().lower()
+    return any(marker in normalized for marker in _UNCERTAINTY_MARKERS)
+
+
+def _candidate_fact_tokens(text: str) -> set[str]:
+    tokens = set()
+    for token in _tokenize(text):
+        if token in _COMMON_NON_FACT_TOKENS:
+            continue
+        if token.isdigit() or len(token) >= 4:
+            tokens.add(token)
+    return tokens
+
+
+def _allowed_grounding_tokens(
+    context: PatientReorientationContext,
+    question: str,
+) -> set[str]:
+    grounded_fragments = [
+        question,
+        context.patient_display_name,
+        context.preferred_name,
+        *context.anchors,
+        *context.care_notes,
+    ]
+
+    for person in context.trusted_people:
+        grounded_fragments.extend(
+            (
+                person.name,
+                person.relationship_to_patient,
+                person.notes,
+            )
+        )
+
+    for routine in context.routines:
+        grounded_fragments.extend(
+            (
+                routine.title,
+                routine.schedule,
+                routine.cue,
+                routine.support_strategy,
+                routine.place_name,
+                routine.temporal_label,
+            )
+        )
+
+    for hit in context.memory_recall.hits:
+        grounded_fragments.extend(
+            (
+                hit.source_display_name,
+                hit.summary,
+                *hit.related_people,
+                *hit.related_places,
+                *hit.related_emotions,
+                *hit.related_routines,
+                *hit.related_episodes,
+            )
+        )
+
+    return {token for fragment in grounded_fragments for token in _tokenize(fragment)}
+
+
+def _tokenize(text: str) -> tuple[str, ...]:
+    return tuple(
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9']+", text)
+        if token.strip()
+    )
