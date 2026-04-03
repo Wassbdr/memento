@@ -106,8 +106,19 @@ function App() {
   const [llmModelsError, setLlmModelsError] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechLevel, setSpeechLevel] = useState(0);
 
   const recorderRef = useRef(null);
+  const orbRef = useRef(null);
+  const playbackRef = useRef(null);
+  const playbackContextRef = useRef(null);
+  const playbackAnalyserRef = useRef(null);
+  const playbackDataRef = useRef(null);
+  const playbackFrameRef = useRef(0);
+  const latestAutoPlayIdRef = useRef("");
+  const speechLevelRef = useRef(0);
+  const orbMotionFrameRef = useRef(0);
 
   const parsedSnapshot = useMemo(() => {
     try {
@@ -199,6 +210,206 @@ function App() {
     return () => controller.abort();
   }, [settings.llmBaseUrl]);
 
+  useEffect(() => {
+    return () => {
+      stopAssistantPlayback();
+    };
+  }, []);
+
+  useEffect(() => {
+    const latestTurn = turns[0];
+    if (!latestTurn?.audioUrl || latestTurn.playbackId === latestAutoPlayIdRef.current) {
+      return;
+    }
+    latestAutoPlayIdRef.current = latestTurn.playbackId;
+    void playAssistantAudio(latestTurn.audioUrl);
+  }, [turns]);
+
+  useEffect(() => {
+    speechLevelRef.current = speechLevel;
+  }, [speechLevel]);
+
+  useEffect(() => {
+    const orbNode = orbRef.current;
+    if (!orbNode) {
+      return undefined;
+    }
+
+    const mode = isSpeaking
+      ? "speaking"
+      : isSending
+        ? "thinking"
+        : isRecording
+          ? "recording"
+          : "idle";
+    const startAt = performance.now();
+
+    const tick = (timestamp) => {
+      const seconds = (timestamp - startAt) / 1000;
+      const liveSpeechLevel = speechLevelRef.current;
+      const motionStrength =
+        mode === "speaking" ? 0.94 : mode === "thinking" ? 0.72 : mode === "recording" ? 0.56 : 0.22;
+      const speechBoost = mode === "speaking" ? liveSpeechLevel * 0.9 : 0;
+      const wave = motionStrength + speechBoost;
+
+      const stageX =
+        Math.sin(seconds * 0.54 + 0.35) * (2.4 + wave * 2.2) +
+        Math.sin(seconds * 1.28 + 2.1) * (0.8 + wave * 0.7);
+      const stageY =
+        Math.cos(seconds * 0.46 + 0.2) * (3 + wave * 2.6) +
+        Math.sin(seconds * 1.12) * (0.6 + wave * 0.5);
+      const stageRotate = Math.sin(seconds * 0.52 + 1.3) * (1.6 + wave * 2.1);
+      const driftX =
+        Math.sin(seconds * 0.88 + 0.4) * (7 + wave * 7) +
+        Math.sin(seconds * 2.24 + 0.8) * (1.8 + wave * 2.2);
+      const driftY =
+        Math.cos(seconds * 0.74 + 1.1) * (6.5 + wave * 6) +
+        Math.sin(seconds * 1.82 + 0.3) * (1.5 + wave * 1.8);
+      const shellShiftX = driftX * 0.34;
+      const shellShiftY = driftY * 0.34;
+      const coreShiftX =
+        driftX * -0.18 + Math.sin(seconds * 2.86 + 0.9) * (1 + wave * 1.8);
+      const coreShiftY =
+        driftY * -0.15 + Math.cos(seconds * 2.32 + 0.4) * (1.2 + wave * 1.7);
+      const haloScale = 1 + motionStrength * 0.05 + speechBoost * 0.07;
+      const stageScale =
+        1 +
+        (mode === "speaking" ? 0.018 : mode === "thinking" ? 0.012 : 0) +
+        liveSpeechLevel * 0.045;
+      const glow = 0.52 + motionStrength * 0.34 + speechBoost * 0.2;
+      const spectrumTilt = Math.sin(seconds * 1.18 + 0.5) * (3 + wave * 7.5);
+
+      orbNode.style.setProperty("--orb-stage-x", `${stageX.toFixed(2)}px`);
+      orbNode.style.setProperty("--orb-stage-y", `${stageY.toFixed(2)}px`);
+      orbNode.style.setProperty("--orb-stage-rotate", `${stageRotate.toFixed(2)}deg`);
+      orbNode.style.setProperty("--orb-stage-scale", stageScale.toFixed(3));
+      orbNode.style.setProperty("--orb-drift-x", `${driftX.toFixed(2)}px`);
+      orbNode.style.setProperty("--orb-drift-y", `${driftY.toFixed(2)}px`);
+      orbNode.style.setProperty("--orb-shell-shift-x", `${shellShiftX.toFixed(2)}px`);
+      orbNode.style.setProperty("--orb-shell-shift-y", `${shellShiftY.toFixed(2)}px`);
+      orbNode.style.setProperty("--orb-core-shift-x", `${coreShiftX.toFixed(2)}px`);
+      orbNode.style.setProperty("--orb-core-shift-y", `${coreShiftY.toFixed(2)}px`);
+      orbNode.style.setProperty("--orb-halo-scale", haloScale.toFixed(3));
+      orbNode.style.setProperty("--orb-glow", glow.toFixed(3));
+      orbNode.style.setProperty("--orb-wave", wave.toFixed(3));
+      orbNode.style.setProperty("--orb-spectrum-tilt", `${spectrumTilt.toFixed(2)}deg`);
+
+      orbMotionFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    orbMotionFrameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (orbMotionFrameRef.current) {
+        cancelAnimationFrame(orbMotionFrameRef.current);
+        orbMotionFrameRef.current = 0;
+      }
+    };
+  }, [isRecording, isSending, isSpeaking]);
+
+  function stopAssistantPlayback() {
+    if (playbackFrameRef.current) {
+      cancelAnimationFrame(playbackFrameRef.current);
+      playbackFrameRef.current = 0;
+    }
+
+    const audio = playbackRef.current;
+    if (audio) {
+      audio.onplay = null;
+      audio.onpause = null;
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      playbackRef.current = null;
+    }
+
+    const context = playbackContextRef.current;
+    playbackAnalyserRef.current = null;
+    playbackDataRef.current = null;
+    playbackContextRef.current = null;
+    if (context) {
+      void context.close().catch(() => {});
+    }
+
+    setIsSpeaking(false);
+    setSpeechLevel(0);
+  }
+
+  function startSpeechMeter() {
+    const analyser = playbackAnalyserRef.current;
+    const data = playbackDataRef.current;
+    if (!analyser || !data) {
+      return;
+    }
+
+    const tick = () => {
+      analyser.getByteFrequencyData(data);
+      const average =
+        data.reduce((sum, value) => sum + value, 0) / Math.max(1, data.length);
+      const normalized = Math.min(1, average / 160);
+      setSpeechLevel((current) => current * 0.58 + normalized * 0.42);
+      playbackFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    tick();
+  }
+
+  async function playAssistantAudio(audioUrl) {
+    stopAssistantPlayback();
+
+    try {
+      const audio = new Audio(audioUrl);
+      audio.preload = "auto";
+      playbackRef.current = audio;
+
+      const BrowserAudioContext = window.AudioContext || window.webkitAudioContext;
+      if (BrowserAudioContext) {
+        const context = new BrowserAudioContext();
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 128;
+        const source = context.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(context.destination);
+
+        playbackContextRef.current = context;
+        playbackAnalyserRef.current = analyser;
+        playbackDataRef.current = new Uint8Array(analyser.frequencyBinCount);
+
+        if (context.state === "suspended") {
+          await context.resume();
+        }
+      }
+
+      audio.onplay = () => {
+        setIsSpeaking(true);
+        setStatus("Parole en cours");
+        startSpeechMeter();
+      };
+      audio.onpause = () => {
+        if (audio.ended) {
+          return;
+        }
+        if (playbackFrameRef.current) {
+          cancelAnimationFrame(playbackFrameRef.current);
+          playbackFrameRef.current = 0;
+        }
+        setIsSpeaking(false);
+        setSpeechLevel(0);
+      };
+      audio.onended = () => {
+        stopAssistantPlayback();
+        setStatus("Pret a ecouter");
+      };
+      audio.onerror = () => {
+        stopAssistantPlayback();
+      };
+
+      await audio.play();
+    } catch (playbackError) {
+      stopAssistantPlayback();
+      setError(playbackError.message || "Lecture audio impossible.");
+    }
+  }
+
   async function submitTextTurn() {
     if (!question.trim()) {
       setError("Le message texte est vide.");
@@ -224,6 +435,7 @@ function App() {
       return;
     }
 
+    stopAssistantPlayback();
     setIsSending(true);
     setError("");
     setStatus(mode === "voice" ? "Transcription et reponse en cours" : "Generation en cours");
@@ -268,6 +480,7 @@ function App() {
 
       const nextTurn = {
         ...payload.turn,
+        playbackId: createPlaybackId(),
         audioUrl:
           payload.turn.audioBase64 && payload.turn.audioMimeType
             ? `data:${payload.turn.audioMimeType};base64,${payload.turn.audioBase64}`
@@ -303,6 +516,7 @@ function App() {
 
   async function startRecording() {
     try {
+      stopAssistantPlayback();
       setError("");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const BrowserAudioContext = window.AudioContext || window.webkitAudioContext;
@@ -367,6 +581,8 @@ function App() {
   }
 
   function clearConversation() {
+    stopAssistantPlayback();
+    latestAutoPlayIdRef.current = "";
     setTurns([]);
     setHistory([]);
     setError("");
@@ -467,17 +683,21 @@ function App() {
 
           <div className="orb-stage">
             <button
+              ref={orbRef}
               type="button"
               className={`orb-button ${isRecording ? "is-recording" : ""} ${
-                isSending ? "is-busy" : ""
-              }`}
+                isSending ? "is-thinking" : ""
+              } ${isSpeaking ? "is-speaking" : ""}`}
               onClick={toggleRecording}
               disabled={isSending}
+              style={{ "--speech-level": speechLevel.toFixed(3) }}
             >
               <span className="orb-ring orb-ring-a" />
               <span className="orb-ring orb-ring-b" />
               <span className="orb-core" />
               <span className="orb-spectrum" />
+              <span className="orb-pulse orb-pulse-a" />
+              <span className="orb-pulse orb-pulse-b" />
               <span className="orb-content">
                 <strong>{patientName}</strong>
                 <small>{isRecording ? "Relacher pour envoyer" : status}</small>
@@ -496,7 +716,7 @@ function App() {
             </div>
             <div className="status-card">
               <span>Mode</span>
-              <strong>{isRecording ? "Ecoute" : "Pret"}</strong>
+              <strong>{isRecording ? "Ecoute" : isSpeaking ? "Parle" : isSending ? "Reflechit" : "Pret"}</strong>
             </div>
           </div>
         </section>
@@ -548,7 +768,10 @@ function App() {
               </div>
             ) : (
               turns.map((turn, index) => (
-                <article className="turn-card" key={`${turn.userText}-${index}`}>
+                <article
+                  className="turn-card"
+                  key={turn.playbackId || `${turn.userText}-${turn.assistantText}-${index}`}
+                >
                   <div className="bubble user">
                     <span className="bubble-label">Vous</span>
                     <p>{turn.userText}</p>
@@ -673,6 +896,10 @@ function extractModelNames(payload) {
       return String(item.name || item.model || "").trim();
     })
     .filter(Boolean);
+}
+
+function createPlaybackId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function formatMetric(value) {

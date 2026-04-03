@@ -136,17 +136,39 @@ button {
 }
 
 .orb-button {
+  --speech-level: 0;
+  --orb-stage-x: 0px;
+  --orb-stage-y: 0px;
+  --orb-stage-rotate: 0deg;
+  --orb-stage-scale: 1;
+  --orb-drift-x: 0px;
+  --orb-drift-y: 0px;
+  --orb-shell-shift-x: 0px;
+  --orb-shell-shift-y: 0px;
+  --orb-core-shift-x: 0px;
+  --orb-core-shift-y: 0px;
+  --orb-halo-scale: 1;
+  --orb-glow: 0.52;
+  --orb-wave: 0.2;
+  --orb-spectrum-tilt: 0deg;
   position: relative;
   width: min(56vw, 390px);
   aspect-ratio: 1;
   border: 0;
   background: transparent;
   border-radius: 50%;
-  transition: transform 180ms ease;
+  transform: translate3d(var(--orb-stage-x), var(--orb-stage-y), 0)
+    rotateZ(var(--orb-stage-rotate))
+    scale(var(--orb-stage-scale));
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 220ms ease;
 }
 
 .orb-button:hover {
-  transform: scale(1.015);
+  transform: translate3d(var(--orb-stage-x), var(--orb-stage-y), 0)
+    rotateZ(var(--orb-stage-rotate))
+    scale(calc(var(--orb-stage-scale) * 1.018));
 }
 
 .orb-button:disabled {
@@ -156,57 +178,132 @@ button {
 .orb-ring,
 .orb-core,
 .orb-spectrum,
-.orb-content {
+.orb-content,
+.orb-pulse {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
+}
+
+.orb-ring,
+.orb-core,
+.orb-spectrum,
+.orb-pulse {
+  border-radius: 46% 54% 49% 51% / 45% 44% 56% 55%;
 }
 
 .orb-ring-a {
   background:
-    conic-gradient(
-      from 0deg,
-      rgba(75, 124, 255, 0.22),
-      rgba(116, 235, 255, 0.98),
-      rgba(255, 192, 107, 0.28),
-      rgba(255, 94, 151, 0.96),
-      rgba(75, 124, 255, 0.22)
-    );
-  filter: blur(20px);
-  animation: spin 12s linear infinite;
+    radial-gradient(circle at 28% 34%, rgba(255, 164, 182, 0.48), transparent 28%),
+    radial-gradient(circle at 72% 26%, rgba(124, 198, 255, 0.42), transparent 22%),
+    radial-gradient(circle at 50% 78%, rgba(255, 192, 107, 0.26), transparent 24%);
+  filter: blur(30px);
+  opacity: calc(0.68 + var(--orb-glow) * 0.28);
+  animation: organHalo 8.6s ease-in-out infinite;
 }
 
 .orb-ring-b {
-  inset: 8%;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  inset: 8.5%;
+  background:
+    radial-gradient(circle at 30% 26%, rgba(255, 255, 255, 0.12), transparent 18%),
+    radial-gradient(circle at 62% 42%, rgba(255, 94, 151, 0.14), transparent 26%),
+    radial-gradient(circle at 50% 100%, rgba(75, 124, 255, 0.14), transparent 44%),
+    linear-gradient(160deg, rgba(31, 18, 27, 0.88), rgba(10, 14, 23, 0.92));
+  border: 1px solid rgba(255, 217, 228, 0.18);
   box-shadow:
-    inset 0 0 22px rgba(255, 255, 255, 0.06),
-    0 0 28px rgba(116, 235, 255, 0.12);
+    inset 0 0 42px rgba(255, 255, 255, 0.05),
+    inset 0 -30px 60px rgba(255, 94, 151, 0.08),
+    0 0 36px rgba(116, 235, 255, 0.09);
+  animation: organShell 9.4s ease-in-out infinite;
 }
 
 .orb-spectrum {
+  inset: 15%;
   background:
-    radial-gradient(circle, transparent 0 59%, #fff 60% 68%, transparent 69%),
-    repeating-conic-gradient(
-      from 0deg,
-      rgba(255, 255, 255, 0.92) 0deg 1deg,
-      transparent 1deg 6deg
-    );
-  mask: radial-gradient(circle, transparent 0 57%, #fff 58% 72%, transparent 73%);
-  opacity: 0.62;
-  animation: pulse 3.2s ease-in-out infinite;
+    radial-gradient(circle at 48% 52%, transparent 0 42%, rgba(255, 255, 255, 0.09) 43% 44%, transparent 45%),
+    repeating-linear-gradient(
+      112deg,
+      rgba(255, 210, 226, 0.18) 0 7px,
+      rgba(255, 210, 226, 0.02) 7px 16px
+    ),
+    linear-gradient(150deg, rgba(116, 235, 255, 0.08), rgba(255, 94, 151, 0.1));
+  mix-blend-mode: screen;
+  mask:
+    radial-gradient(circle at center, transparent 0 24%, #fff 35% 76%, transparent 86%),
+    linear-gradient(#fff, #fff);
+  opacity: 0.42;
+  filter: blur(0.6px);
+  animation: organVeins 10.8s ease-in-out infinite;
+  transform-origin: center;
 }
 
 .orb-core {
-  inset: 14%;
+  inset: 16.5%;
   background:
-    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.1), transparent 15%),
-    radial-gradient(circle at 66% 42%, rgba(75, 124, 255, 0.13), transparent 26%),
-    radial-gradient(circle at 50% 50%, rgba(11, 15, 24, 0.82), rgba(1, 2, 4, 0.98) 74%);
+    radial-gradient(circle at 34% 26%, rgba(255, 232, 240, 0.18), transparent 14%),
+    radial-gradient(circle at 69% 36%, rgba(75, 124, 255, 0.15), transparent 24%),
+    radial-gradient(circle at 52% 72%, rgba(255, 94, 151, 0.18), transparent 26%),
+    radial-gradient(circle at 50% 52%, rgba(33, 19, 30, 0.96), rgba(7, 9, 15, 0.98) 76%);
   box-shadow:
-    inset 0 0 72px rgba(0, 0, 0, 0.78),
-    inset 0 0 16px rgba(116, 235, 255, 0.08),
-    0 0 50px rgba(75, 124, 255, 0.1);
+    inset 0 0 80px rgba(0, 0, 0, 0.82),
+    inset 0 -14px 36px rgba(255, 94, 151, 0.14),
+    inset 0 18px 28px rgba(124, 198, 255, 0.08),
+    0 0 60px rgba(75, 124, 255, 0.08);
+  animation: organBreath 6.6s ease-in-out infinite;
+  transform: scale(calc(1 + var(--speech-level) * 0.06));
+}
+
+.orb-core::before,
+.orb-core::after,
+.orb-ring-b::before,
+.orb-ring-b::after {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+}
+
+.orb-core::before {
+  inset: 18% 24% 22% 20%;
+  background:
+    radial-gradient(circle at 38% 40%, rgba(255, 255, 255, 0.16), transparent 18%),
+    radial-gradient(circle at 60% 48%, rgba(255, 94, 151, 0.18), transparent 34%),
+    radial-gradient(circle at 52% 52%, rgba(21, 6, 12, 0.86), rgba(5, 5, 8, 0.2) 78%);
+  filter: blur(3px);
+  opacity: 0.72;
+}
+
+.orb-core::after {
+  inset: 8%;
+  border: 1px solid rgba(255, 221, 232, 0.08);
+  box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.04);
+}
+
+.orb-ring-b::before {
+  inset: 10%;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  filter: blur(0.6px);
+}
+
+.orb-ring-b::after {
+  inset: 18%;
+  background:
+    radial-gradient(circle at 40% 50%, rgba(255, 94, 151, 0.08), transparent 32%),
+    radial-gradient(circle at 66% 42%, rgba(116, 235, 255, 0.05), transparent 30%);
+  opacity: 0.8;
+}
+
+.orb-pulse {
+  inset: 4%;
+  border: 1px solid rgba(255, 224, 230, 0.08);
+  opacity: 0;
+}
+
+.orb-pulse-a {
+  animation: organPulseRing 5.8s ease-out infinite;
+}
+
+.orb-pulse-b {
+  inset: 12%;
+  animation: organPulseRing 5.8s ease-out infinite 1.8s;
 }
 
 .orb-content {
@@ -217,6 +314,11 @@ button {
   gap: 0.55rem;
   z-index: 2;
   inset: 18%;
+  transform: translate3d(
+    calc(var(--orb-core-shift-x) * 0.16),
+    calc(var(--orb-core-shift-y) * 0.16),
+    0
+  );
 }
 
 .orb-content strong {
@@ -234,19 +336,78 @@ button {
 }
 
 .orb-button.is-recording .orb-ring-a {
-  animation-duration: 2.1s;
+  animation-duration: 2.4s;
+  opacity: 1;
 }
 
 .orb-button.is-recording .orb-spectrum {
-  opacity: 0.92;
-  transform: scale(1.04);
+  opacity: 0.78;
 }
 
-.orb-button.is-busy .orb-core {
+.orb-button.is-recording .orb-core {
   box-shadow:
-    inset 0 0 72px rgba(0, 0, 0, 0.78),
-    inset 0 0 24px rgba(255, 192, 107, 0.08),
-    0 0 54px rgba(255, 94, 151, 0.12);
+    inset 0 0 80px rgba(0, 0, 0, 0.82),
+    inset 0 -20px 36px rgba(255, 94, 151, 0.16),
+    inset 0 18px 28px rgba(124, 198, 255, 0.1),
+    0 0 72px rgba(124, 198, 255, 0.18);
+}
+
+.orb-button.is-thinking .orb-ring-a {
+  animation-duration: 3.1s;
+  filter: blur(26px) saturate(1.18);
+}
+
+.orb-button.is-thinking .orb-ring-b {
+  animation-duration: 2.2s;
+}
+
+.orb-button.is-thinking .orb-core {
+  animation: organThink 1.55s ease-in-out infinite;
+  box-shadow:
+    inset 0 0 80px rgba(0, 0, 0, 0.82),
+    inset 0 -18px 38px rgba(255, 192, 107, 0.15),
+    inset 0 18px 26px rgba(124, 198, 255, 0.1),
+    0 0 72px rgba(255, 94, 151, 0.18);
+}
+
+.orb-button.is-thinking .orb-spectrum {
+  opacity: 0.72;
+  animation-duration: 1.3s;
+}
+
+.orb-button.is-speaking .orb-ring-a {
+  animation-duration: 1.6s;
+  opacity: 1;
+  filter: blur(24px) saturate(1.45);
+}
+
+.orb-button.is-speaking .orb-ring-b {
+  animation-duration: 1.8s;
+  box-shadow:
+    inset 0 0 42px rgba(255, 255, 255, 0.06),
+    inset 0 -28px 60px rgba(255, 94, 151, 0.16),
+    0 0 44px rgba(116, 235, 255, 0.2);
+}
+
+.orb-button.is-speaking .orb-core {
+  animation: organSpeak 0.42s ease-in-out infinite;
+  transform: scale(calc(1.02 + var(--speech-level) * 0.16));
+}
+
+.orb-button.is-speaking .orb-spectrum {
+  opacity: calc(0.54 + var(--speech-level) * 0.4);
+  animation-duration: 0.68s;
+}
+
+.orb-button.is-speaking .orb-pulse {
+  opacity: 1;
+}
+
+.field small {
+  display: block;
+  margin-top: 0.55rem;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .status-grid {
@@ -503,24 +664,174 @@ button {
   color: var(--muted);
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
+@keyframes organHalo {
+  0%,
+  100% {
+    transform: translate3d(
+        calc(var(--orb-drift-x) * 0.16),
+        calc(var(--orb-drift-y) * 0.16),
+        0
+      )
+      rotate(0deg)
+      scale(calc(0.98 * var(--orb-halo-scale)));
   }
-  to {
-    transform: rotate(360deg);
+  33% {
+    transform: translate3d(
+        calc(var(--orb-drift-x) * -0.08),
+        calc(var(--orb-drift-y) * 0.2),
+        0
+      )
+      rotate(9deg)
+      scale(calc(1.03 * var(--orb-halo-scale)), calc(0.97 * var(--orb-halo-scale)));
+  }
+  66% {
+    transform: translate3d(
+        calc(var(--orb-drift-x) * 0.18),
+        calc(var(--orb-drift-y) * -0.14),
+        0
+      )
+      rotate(-7deg)
+      scale(calc(0.97 * var(--orb-halo-scale)), calc(1.03 * var(--orb-halo-scale)));
   }
 }
 
-@keyframes pulse {
+@keyframes organShell {
   0%,
   100% {
-    transform: scale(0.985);
-    opacity: 0.45;
+    transform: translate3d(var(--orb-shell-shift-x), var(--orb-shell-shift-y), 0)
+      rotate(0deg)
+      scale(calc(1 + var(--orb-wave) * 0.012));
+    border-radius: 46% 54% 49% 51% / 45% 44% 56% 55%;
   }
   50% {
-    transform: scale(1.03);
-    opacity: 0.88;
+    transform: translate3d(
+        calc(var(--orb-shell-shift-x) * -0.7),
+        calc(var(--orb-shell-shift-y) * -0.7),
+        0
+      )
+      rotate(-5deg)
+      scale(calc(1.02 + var(--orb-wave) * 0.02));
+    border-radius: 52% 48% 44% 56% / 42% 55% 45% 58%;
+  }
+}
+
+@keyframes organBreath {
+  0%,
+  100% {
+    transform: translate3d(var(--orb-core-shift-x), var(--orb-core-shift-y), 0)
+      scale(calc(0.985 + var(--orb-wave) * 0.016));
+    border-radius: 48% 52% 50% 50% / 46% 44% 56% 54%;
+  }
+  50% {
+    transform: translate3d(
+        calc(var(--orb-core-shift-x) * -0.72),
+        calc(var(--orb-core-shift-y) * -0.72),
+        0
+      )
+      scale(calc(1.025 + var(--orb-wave) * 0.024));
+    border-radius: 54% 46% 46% 54% / 42% 56% 44% 58%;
+  }
+}
+
+@keyframes organThink {
+  0%,
+  100% {
+    transform: translate3d(var(--orb-core-shift-x), var(--orb-core-shift-y), 0)
+      scale(calc(0.98 + var(--orb-wave) * 0.018))
+      rotate(0deg);
+    border-radius: 48% 52% 50% 50% / 46% 44% 56% 54%;
+  }
+  30% {
+    transform: translate3d(
+        calc(var(--orb-core-shift-x) * -0.9),
+        calc(var(--orb-core-shift-y) * 0.56),
+        0
+      )
+      scale(calc(1.035 + var(--orb-wave) * 0.028), calc(0.99 + var(--orb-wave) * 0.016))
+      rotate(-4deg);
+    border-radius: 56% 44% 48% 52% / 40% 58% 42% 60%;
+  }
+  70% {
+    transform: translate3d(
+        calc(var(--orb-core-shift-x) * 0.66),
+        calc(var(--orb-core-shift-y) * -0.88),
+        0
+      )
+      scale(calc(0.99 + var(--orb-wave) * 0.016), calc(1.04 + var(--orb-wave) * 0.03))
+      rotate(4deg);
+    border-radius: 42% 58% 54% 46% / 58% 42% 60% 40%;
+  }
+}
+
+@keyframes organSpeak {
+  0%,
+  100% {
+    transform: translate3d(var(--orb-core-shift-x), var(--orb-core-shift-y), 0)
+      scale(calc(0.98 + var(--speech-level) * 0.12 + var(--orb-wave) * 0.018));
+    border-radius: 46% 54% 50% 50% / 44% 46% 54% 56%;
+  }
+  25% {
+    transform: translate3d(
+        calc(var(--orb-core-shift-x) * -0.84),
+        calc(var(--orb-core-shift-y) * 0.7),
+        0
+      )
+      scale(calc(1.01 + var(--speech-level) * 0.14 + var(--orb-wave) * 0.022));
+    border-radius: 58% 42% 46% 54% / 38% 60% 40% 62%;
+  }
+  50% {
+    transform: translate3d(
+        calc(var(--orb-core-shift-x) * 0.62),
+        calc(var(--orb-core-shift-y) * -0.78),
+        0
+      )
+      scale(calc(1.03 + var(--speech-level) * 0.16 + var(--orb-wave) * 0.026));
+    border-radius: 42% 58% 58% 42% / 60% 38% 62% 40%;
+  }
+  75% {
+    transform: translate3d(
+        calc(var(--orb-core-shift-x) * -0.3),
+        calc(var(--orb-core-shift-y) * -0.22),
+        0
+      )
+      scale(calc(1 + var(--speech-level) * 0.13 + var(--orb-wave) * 0.02));
+    border-radius: 52% 48% 44% 56% / 46% 54% 42% 58%;
+  }
+}
+
+@keyframes organVeins {
+  0%,
+  100% {
+    transform: translate3d(
+        calc(var(--orb-core-shift-x) * -0.28),
+        calc(var(--orb-core-shift-y) * -0.28),
+        0
+      )
+      rotate(var(--orb-spectrum-tilt))
+      scale(calc(0.99 + var(--orb-wave) * 0.014));
+  }
+  50% {
+    transform: translate3d(
+        calc(var(--orb-core-shift-x) * 0.16),
+        calc(var(--orb-core-shift-y) * 0.16),
+        0
+      )
+      rotate(calc(var(--orb-spectrum-tilt) + 7deg))
+      scale(calc(1.03 + var(--orb-wave) * 0.02));
+  }
+}
+
+@keyframes organPulseRing {
+  0% {
+    transform: scale(0.84);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1.14);
+    opacity: 0;
   }
 }
 
