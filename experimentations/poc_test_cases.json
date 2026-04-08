@@ -1,0 +1,844 @@
+{
+  "poc_name": "Memento memory and conversation POC",
+  "version": "2.0",
+  "purpose": "Centraliser des cas de demonstration plus proches du reel pour montrer comment Memento aide differents patients selon leur contexte de vie, leurs proches et leurs routines.",
+  "usage": {
+    "mode": "reference_cases",
+    "notes": [
+      "Le fichier conserve un snapshot de reference compatible avec les tests automatises existants.",
+      "Il ajoute aussi un catalogue de patients fictifs mais plausibles pour les demonstrations produit, les smoke tests manuels et les essais UX.",
+      "Chaque cas peut pointer vers un patient different via snapshot_ref pour varier les situations de confusion, de reassurance et de rappel autobiographique."
+    ]
+  },
+  "shared_snapshot": {
+    "patient": {
+      "patient_id": "rose",
+      "display_name": "Rose Martin",
+      "preferred_name": "Madame Rose",
+      "care_notes": [
+        "Rassurer avant de recontextualiser et eviter de contredire brutalement.",
+        "Parler lentement avec des phrases courtes et concretes.",
+        "Proposer un repere immediat avant de donner plusieurs informations."
+      ],
+      "anchors": [
+        "Vous vivez dans votre appartement rue des Lilas a Lyon.",
+        "Claire, votre fille, passe souvent le dimanche midi.",
+        "Votre fauteuil bleu est pres de la bibliotheque dans le salon."
+      ]
+    },
+    "people": [
+      {
+        "person_id": "claire",
+        "name": "Claire Martin",
+        "relationship_to_patient": "sa fille",
+        "notes": "Organise les rendez-vous, fait les courses et vient souvent le dimanche pour dejeuner.",
+        "emotional_significance": 0.98
+      },
+      {
+        "person_id": "lucas",
+        "name": "Lucas Martin",
+        "relationship_to_patient": "son petit-fils",
+        "notes": "Passe le mercredi apres les cours et aide a regler la television.",
+        "emotional_significance": 0.82
+      },
+      {
+        "person_id": "sophie",
+        "name": "Sophie Benali",
+        "relationship_to_patient": "son aide a domicile",
+        "notes": "Vient le matin en semaine pour aider au petit-dejeuner et aux medicaments.",
+        "emotional_significance": 0.76
+      }
+    ],
+    "places": [
+      {
+        "place_id": "home_living_room",
+        "name": "Salon",
+        "category": "home_room",
+        "notes": "Fauteuil bleu, bibliotheque en bois clair et photos de famille sur la commode."
+      },
+      {
+        "place_id": "home_kitchen",
+        "name": "Cuisine",
+        "category": "home_room",
+        "notes": "Petite table ronde pres de la fenetre, tasse rouge preferee de Rose."
+      },
+      {
+        "place_id": "bakery",
+        "name": "Boulangerie du coin",
+        "category": "neighborhood_place",
+        "notes": "A deux rues de l'appartement, connue pour les tartelettes au citron."
+      }
+    ],
+    "routines": [
+      {
+        "routine_id": "breakfast",
+        "title": "Petit-dejeuner du matin",
+        "schedule": "Tous les jours a 08:00",
+        "description": "The leger dans la tasse rouge avec deux biscottes et de la confiture d'abricot.",
+        "cue": "La bouilloire siffle dans la cuisine.",
+        "support_strategy": "Inviter Rose a s'asseoir a la table ronde et lui montrer la tasse rouge.",
+        "place_id": "home_kitchen"
+      },
+      {
+        "routine_id": "medication_weekday",
+        "title": "Prise des medicaments du matin",
+        "schedule": "Du lundi au vendredi a 09:00",
+        "description": "Sophie prepare le pilulier apres le petit-dejeuner.",
+        "cue": "Le pilulier bleu est pose a cote de la corbeille a pain.",
+        "support_strategy": "Nommer Sophie et rappeler que les comprimes viennent apres le the.",
+        "place_id": "home_kitchen"
+      },
+      {
+        "routine_id": "sunday_lunch",
+        "title": "Dejeuner du dimanche",
+        "schedule": "Le dimanche a 12:30",
+        "description": "Claire vient partager le repas et apporte souvent un dessert.",
+        "cue": "Mettre la nappe claire sur la table avant midi.",
+        "support_strategy": "Rappeler que Claire arrive apres la matinee et qu'il n'y a rien a preparer seule.",
+        "place_id": "home_kitchen"
+      }
+    ],
+    "episodes": [
+      {
+        "episode_id": "ep_sunday_tarte",
+        "title": "Dejeuner du dimanche avec Claire",
+        "narrative": "Claire a apporte une tarte aux pommes et a dejeuner avec Rose dans la cuisine. Le repas etait calme et joyeux.",
+        "happened_on": "2026-03-29",
+        "people_ids": [
+          "claire"
+        ],
+        "place_id": "home_kitchen",
+        "emotions": [
+          {
+            "label": "joie",
+            "valence": 0.92,
+            "intensity": 0.8
+          }
+        ],
+        "tags": [
+          "famille",
+          "repas",
+          "dimanche"
+        ]
+      },
+      {
+        "episode_id": "ep_lucas_wednesday",
+        "title": "Passage de Lucas apres les cours",
+        "narrative": "Lucas est passe en fin d'apres-midi, a repare la television et a bu un jus d'orange avec Rose dans le salon.",
+        "happened_on": "2026-04-01",
+        "people_ids": [
+          "lucas"
+        ],
+        "place_id": "home_living_room",
+        "emotions": [
+          {
+            "label": "fierte",
+            "valence": 0.74,
+            "intensity": 0.6
+          }
+        ],
+        "tags": [
+          "famille",
+          "television",
+          "mercredi"
+        ]
+      },
+      {
+        "episode_id": "ep_bakery_walk",
+        "title": "Sortie a la boulangerie",
+        "narrative": "Sophie a accompagne Rose a la boulangerie du coin pour acheter du pain frais et une tartelette au citron.",
+        "happened_on": "2026-04-03",
+        "people_ids": [
+          "sophie"
+        ],
+        "place_id": "bakery",
+        "emotions": [
+          {
+            "label": "apaisement",
+            "valence": 0.68,
+            "intensity": 0.55
+          }
+        ],
+        "tags": [
+          "sortie",
+          "quartier",
+          "courses"
+        ]
+      }
+    ]
+  },
+  "patient_snapshots": {
+    "rose_home_support": {
+      "description": "Patiente vivant a domicile avec soutien familial et aide a domicile en semaine.",
+      "clinical_focus": [
+        "reorientation douce",
+        "rituels du matin",
+        "visites familiales"
+      ],
+      "snapshot": {
+        "patient": {
+          "patient_id": "rose",
+          "display_name": "Rose Martin",
+          "preferred_name": "Madame Rose",
+          "care_notes": [
+            "Rassurer avant de recontextualiser et eviter de contredire brutalement.",
+            "Parler lentement avec des phrases courtes et concretes.",
+            "Proposer un repere immediat avant de donner plusieurs informations."
+          ],
+          "anchors": [
+            "Vous vivez dans votre appartement rue des Lilas a Lyon.",
+            "Claire, votre fille, passe souvent le dimanche midi.",
+            "Votre fauteuil bleu est pres de la bibliotheque dans le salon."
+          ]
+        },
+        "people": [
+          {
+            "person_id": "claire",
+            "name": "Claire Martin",
+            "relationship_to_patient": "sa fille",
+            "notes": "Organise les rendez-vous, fait les courses et vient souvent le dimanche pour dejeuner.",
+            "emotional_significance": 0.98
+          },
+          {
+            "person_id": "lucas",
+            "name": "Lucas Martin",
+            "relationship_to_patient": "son petit-fils",
+            "notes": "Passe le mercredi apres les cours et aide a regler la television.",
+            "emotional_significance": 0.82
+          },
+          {
+            "person_id": "sophie",
+            "name": "Sophie Benali",
+            "relationship_to_patient": "son aide a domicile",
+            "notes": "Vient le matin en semaine pour aider au petit-dejeuner et aux medicaments.",
+            "emotional_significance": 0.76
+          }
+        ],
+        "places": [
+          {
+            "place_id": "home_living_room",
+            "name": "Salon",
+            "category": "home_room",
+            "notes": "Fauteuil bleu, bibliotheque en bois clair et photos de famille sur la commode."
+          },
+          {
+            "place_id": "home_kitchen",
+            "name": "Cuisine",
+            "category": "home_room",
+            "notes": "Petite table ronde pres de la fenetre, tasse rouge preferee de Rose."
+          },
+          {
+            "place_id": "bakery",
+            "name": "Boulangerie du coin",
+            "category": "neighborhood_place",
+            "notes": "A deux rues de l'appartement, connue pour les tartelettes au citron."
+          }
+        ],
+        "routines": [
+          {
+            "routine_id": "breakfast",
+            "title": "Petit-dejeuner du matin",
+            "schedule": "Tous les jours a 08:00",
+            "description": "The leger dans la tasse rouge avec deux biscottes et de la confiture d'abricot.",
+            "cue": "La bouilloire siffle dans la cuisine.",
+            "support_strategy": "Inviter Rose a s'asseoir a la table ronde et lui montrer la tasse rouge.",
+            "place_id": "home_kitchen"
+          },
+          {
+            "routine_id": "medication_weekday",
+            "title": "Prise des medicaments du matin",
+            "schedule": "Du lundi au vendredi a 09:00",
+            "description": "Sophie prepare le pilulier apres le petit-dejeuner.",
+            "cue": "Le pilulier bleu est pose a cote de la corbeille a pain.",
+            "support_strategy": "Nommer Sophie et rappeler que les comprimes viennent apres le the.",
+            "place_id": "home_kitchen"
+          },
+          {
+            "routine_id": "sunday_lunch",
+            "title": "Dejeuner du dimanche",
+            "schedule": "Le dimanche a 12:30",
+            "description": "Claire vient partager le repas et apporte souvent un dessert.",
+            "cue": "Mettre la nappe claire sur la table avant midi.",
+            "support_strategy": "Rappeler que Claire arrive apres la matinee et qu'il n'y a rien a preparer seule.",
+            "place_id": "home_kitchen"
+          }
+        ],
+        "episodes": [
+          {
+            "episode_id": "ep_sunday_tarte",
+            "title": "Dejeuner du dimanche avec Claire",
+            "narrative": "Claire a apporte une tarte aux pommes et a dejeuner avec Rose dans la cuisine. Le repas etait calme et joyeux.",
+            "happened_on": "2026-03-29",
+            "people_ids": [
+              "claire"
+            ],
+            "place_id": "home_kitchen",
+            "emotions": [
+              {
+                "label": "joie",
+                "valence": 0.92,
+                "intensity": 0.8
+              }
+            ],
+            "tags": [
+              "famille",
+              "repas",
+              "dimanche"
+            ]
+          },
+          {
+            "episode_id": "ep_lucas_wednesday",
+            "title": "Passage de Lucas apres les cours",
+            "narrative": "Lucas est passe en fin d'apres-midi, a repare la television et a bu un jus d'orange avec Rose dans le salon.",
+            "happened_on": "2026-04-01",
+            "people_ids": [
+              "lucas"
+            ],
+            "place_id": "home_living_room",
+            "emotions": [
+              {
+                "label": "fierte",
+                "valence": 0.74,
+                "intensity": 0.6
+              }
+            ],
+            "tags": [
+              "famille",
+              "television",
+              "mercredi"
+            ]
+          },
+          {
+            "episode_id": "ep_bakery_walk",
+            "title": "Sortie a la boulangerie",
+            "narrative": "Sophie a accompagne Rose a la boulangerie du coin pour acheter du pain frais et une tartelette au citron.",
+            "happened_on": "2026-04-03",
+            "people_ids": [
+              "sophie"
+            ],
+            "place_id": "bakery",
+            "emotions": [
+              {
+                "label": "apaisement",
+                "valence": 0.68,
+                "intensity": 0.55
+              }
+            ],
+            "tags": [
+              "sortie",
+              "quartier",
+              "courses"
+            ]
+          }
+        ]
+      }
+    },
+    "jean_care_home": {
+      "description": "Patient en unite protegee, ancien mecanicien, anxiete augmentee en fin d'apres-midi.",
+      "clinical_focus": [
+        "angoisse de fin de journee",
+        "repere institutionnel rassurant",
+        "proches de confiance"
+      ],
+      "snapshot": {
+        "patient": {
+          "patient_id": "jean",
+          "display_name": "Jean Morel",
+          "preferred_name": "Monsieur Jean",
+          "care_notes": [
+            "Commencer par dire ou il est et qui est present autour de lui.",
+            "Eviter de lui donner trop d'instructions d'un coup.",
+            "Quand l'anxiete monte, rappeler l'atelier d'entretien qu'il aime observer."
+          ],
+          "anchors": [
+            "Vous etes a la residence des Tilleuls, dans votre chambre au premier etage.",
+            "Votre fille Elise vient souvent le mardi et le samedi.",
+            "Le fauteuil marron et la radio posee sur la table de nuit sont dans votre chambre."
+          ]
+        },
+        "people": [
+          {
+            "person_id": "elise",
+            "name": "Elise Morel",
+            "relationship_to_patient": "sa fille",
+            "notes": "Passe apres son travail le mardi et prend le cafe avec lui le samedi.",
+            "emotional_significance": 0.97
+          },
+          {
+            "person_id": "marcel",
+            "name": "Marcel Morel",
+            "relationship_to_patient": "son frere",
+            "notes": "Telephone le jeudi matin et parle souvent des voitures anciennes.",
+            "emotional_significance": 0.79
+          },
+          {
+            "person_id": "ines",
+            "name": "Ines Dupont",
+            "relationship_to_patient": "son infirmiere referente",
+            "notes": "Connue et bien acceptee, aide au traitement du soir.",
+            "emotional_significance": 0.74
+          }
+        ],
+        "places": [
+          {
+            "place_id": "room_12",
+            "name": "Chambre 12",
+            "category": "care_home_room",
+            "notes": "Chambre calme avec radio, plaid gris et photos d'Elise."
+          },
+          {
+            "place_id": "dining_room",
+            "name": "Salle a manger",
+            "category": "care_home_common_area",
+            "notes": "Grande piece lumineuse ou Jean prend son cafe l'apres-midi."
+          },
+          {
+            "place_id": "workshop_corner",
+            "name": "Coin atelier",
+            "category": "care_home_activity_space",
+            "notes": "Petit espace avec outils factices et magazines automobiles."
+          }
+        ],
+        "routines": [
+          {
+            "routine_id": "coffee_1630",
+            "title": "Cafe de l'apres-midi",
+            "schedule": "Tous les jours a 16:30",
+            "description": "Jean prend un cafe decafeine en salle a manger avant la fin de journee.",
+            "cue": "Le personnel apporte les tasses blanches sur le chariot.",
+            "support_strategy": "L'accompagner doucement vers la salle a manger en nommant le cafe et Elise si elle doit venir.",
+            "place_id": "dining_room"
+          },
+          {
+            "routine_id": "medication_evening",
+            "title": "Traitement du soir",
+            "schedule": "Tous les jours a 18:30",
+            "description": "Ines apporte le traitement dans la chambre apres le retour au calme.",
+            "cue": "Le gobelet d'eau est pose sur la table de nuit.",
+            "support_strategy": "Presenter Ines par son prenom et rappeler que le traitement vient apres le cafe.",
+            "place_id": "room_12"
+          },
+          {
+            "routine_id": "atelier_friday",
+            "title": "Atelier souvenirs mecanique",
+            "schedule": "Le vendredi a 10:00",
+            "description": "Jean regarde des photos de voitures et commente les moteurs avec l'animateur.",
+            "cue": "Le classeur rouge avec les images de voitures anciennes est ouvert.",
+            "support_strategy": "Valoriser son expertise et lui proposer de montrer une photo preferee.",
+            "place_id": "workshop_corner"
+          }
+        ],
+        "episodes": [
+          {
+            "episode_id": "ep_elise_cafe",
+            "title": "Cafe avec Elise",
+            "narrative": "Elise est venue samedi prendre un cafe avec Jean en salle a manger. Ils ont regarde ensemble des photos de famille.",
+            "happened_on": "2026-04-04",
+            "people_ids": [
+              "elise"
+            ],
+            "place_id": "dining_room",
+            "emotions": [
+              {
+                "label": "reassurance",
+                "valence": 0.9,
+                "intensity": 0.78
+              }
+            ],
+            "tags": [
+              "famille",
+              "visite",
+              "cafe"
+            ]
+          },
+          {
+            "episode_id": "ep_workshop_discussion",
+            "title": "Discussion autour des voitures anciennes",
+            "narrative": "Pendant l'atelier, Jean a explique comment il reglait autrefois un carburateur et a souri en feuilletant un magazine automobile.",
+            "happened_on": "2026-03-27",
+            "people_ids": [],
+            "place_id": "workshop_corner",
+            "emotions": [
+              {
+                "label": "fierte",
+                "valence": 0.81,
+                "intensity": 0.72
+              }
+            ],
+            "tags": [
+              "atelier",
+              "voitures",
+              "identite"
+            ]
+          }
+        ]
+      }
+    },
+    "amina_family_home": {
+      "description": "Patiente vivant avec son mari, attachee a ses routines familiales, au marche et aux reperes spirituels.",
+      "clinical_focus": [
+        "repere conjugal",
+        "sorties accompagnees",
+        "reassurance en fin d'apres-midi"
+      ],
+      "snapshot": {
+        "patient": {
+          "patient_id": "amina",
+          "display_name": "Amina Ben Salem",
+          "preferred_name": "Amina",
+          "care_notes": [
+            "Nommer d'abord son mari Samir et la maison avant de parler du programme.",
+            "Utiliser un ton doux et concret, surtout apres la sieste.",
+            "Si elle cherche sa fille, rappeler le prochain appel video ou la prochaine visite."
+          ],
+          "anchors": [
+            "Vous vivez avec Samir dans votre maison a Villeurbanne.",
+            "Le tapis bleu du salon et les plantes sur le balcon vous sont familiers.",
+            "Le samedi matin, vous allez souvent au marche avec Samir."
+          ]
+        },
+        "people": [
+          {
+            "person_id": "samir",
+            "name": "Samir Ben Salem",
+            "relationship_to_patient": "son mari",
+            "notes": "Vit avec Amina, cuisine le soir et l'accompagne pour les sorties courtes.",
+            "emotional_significance": 0.99
+          },
+          {
+            "person_id": "leila",
+            "name": "Leila Haddad",
+            "relationship_to_patient": "sa fille",
+            "notes": "Appelle en video le mardi soir et vient dejeuner un dimanche sur deux avec ses enfants.",
+            "emotional_significance": 0.93
+          },
+          {
+            "person_id": "nora",
+            "name": "Nora Petit",
+            "relationship_to_patient": "son auxiliaire de vie",
+            "notes": "Passe trois apres-midis par semaine pour la promenade et la preparation du diner.",
+            "emotional_significance": 0.72
+          }
+        ],
+        "places": [
+          {
+            "place_id": "living_room",
+            "name": "Salon",
+            "category": "home_room",
+            "notes": "Canape beige, tapis bleu et balcon avec herbes aromatiques."
+          },
+          {
+            "place_id": "kitchen",
+            "name": "Cuisine",
+            "category": "home_room",
+            "notes": "Odeur d'epices douce, Samir prepare souvent la soupe du soir."
+          },
+          {
+            "place_id": "market",
+            "name": "Marche des Gratte-Ciel",
+            "category": "neighborhood_place",
+            "notes": "Amina aime y acheter des olives, de la menthe et des oranges avec Samir."
+          }
+        ],
+        "routines": [
+          {
+            "routine_id": "tea_1700",
+            "title": "The de fin d'apres-midi",
+            "schedule": "Tous les jours a 17:00",
+            "description": "Samir sert le the a la menthe dans le salon apres la sieste.",
+            "cue": "Le plateau en metal est pose sur la table basse.",
+            "support_strategy": "Inviter Amina a s'asseoir pres du tapis bleu et nommer Samir.",
+            "place_id": "living_room"
+          },
+          {
+            "routine_id": "market_saturday",
+            "title": "Sortie au marche",
+            "schedule": "Le samedi a 09:30",
+            "description": "Amina et Samir vont ensemble au marche acheter des fruits et des herbes fraiches.",
+            "cue": "Le cabas rayé est pres de la porte d'entree.",
+            "support_strategy": "Rappeler que Samir l'accompagne et que la sortie est courte.",
+            "place_id": "market"
+          },
+          {
+            "routine_id": "video_call_tuesday",
+            "title": "Appel video avec Leila",
+            "schedule": "Le mardi a 19:00",
+            "description": "Leila appelle pour prendre des nouvelles et montrer les enfants.",
+            "cue": "Le telephone est pose sur son support pres du canape.",
+            "support_strategy": "Dire que Leila appellera ce soir et montrer le telephone si besoin.",
+            "place_id": "living_room"
+          }
+        ],
+        "episodes": [
+          {
+            "episode_id": "ep_market_oranges",
+            "title": "Matinee au marche avec Samir",
+            "narrative": "Amina et Samir sont alles au marche ensemble. Ils ont achete des oranges, de la menthe et des olives avant de rentrer calmement a la maison.",
+            "happened_on": "2026-04-04",
+            "people_ids": [
+              "samir"
+            ],
+            "place_id": "market",
+            "emotions": [
+              {
+                "label": "plaisir",
+                "valence": 0.87,
+                "intensity": 0.71
+              }
+            ],
+            "tags": [
+              "sortie",
+              "marche",
+              "couple"
+            ]
+          },
+          {
+            "episode_id": "ep_family_video_call",
+            "title": "Appel video avec Leila et les enfants",
+            "narrative": "Leila a appelle en video et a montre les enfants en train de dessiner. Amina a souri en les voyant sur l'ecran.",
+            "happened_on": "2026-04-01",
+            "people_ids": [
+              "leila"
+            ],
+            "place_id": "living_room",
+            "emotions": [
+              {
+                "label": "joie",
+                "valence": 0.91,
+                "intensity": 0.76
+              }
+            ],
+            "tags": [
+              "famille",
+              "appel",
+              "petits-enfants"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "MEM-001",
+      "snapshot_ref": "rose_home_support",
+      "title": "Rappel semantique d'une visite familiale a domicile",
+      "goal": "Verifier qu'une question libre retrouve le souvenir du dejeuner dominical et l'enrichit avec le proche, le lieu et l'emotion associes.",
+      "kind": "automated_reference",
+      "layer": "memory.recall",
+      "input": {
+        "patient_id": "rose",
+        "query": "Qui vient le dimanche dejeuner avec moi dans la cuisine ?",
+        "top_k": 2
+      },
+      "expected": {
+        "has_hits": true,
+        "top_hit": {
+          "source_label": "Episode",
+          "related_people_contains": [
+            "Claire Martin"
+          ],
+          "related_places_contains": [
+            "Cuisine"
+          ],
+          "related_emotions_contains": [
+            "joie"
+          ]
+        }
+      },
+      "evidence": {
+        "pytest_tests": [
+          "tests/test_memory_sync.py::test_sync_engine_writes_graph_and_semantic_index_then_recalls_context"
+        ]
+      }
+    },
+    {
+      "id": "REO-001",
+      "snapshot_ref": "rose_home_support",
+      "title": "Reorientation douce au reveil pour un patient vivant seul",
+      "goal": "Verifier qu'en cas de confusion matinale, le contexte met en avant l'identite, le domicile, la presence de Sophie et la routine immediate du petit-dejeuner.",
+      "kind": "automated_reference",
+      "layer": "memory.reorientation",
+      "input": {
+        "patient_id": "rose",
+        "query": "Je suis un peu perdue ce matin, qu'est-ce que je fais maintenant ?",
+        "top_k": 3,
+        "reference_datetime": "2026-04-06T07:50:00"
+      },
+      "expected": {
+        "patient_display_name": "Rose Martin",
+        "anchors_contains": [
+          "Vous vivez dans votre appartement rue des Lilas a Lyon."
+        ],
+        "trusted_people_contains": [
+          "Claire Martin",
+          "Sophie Benali"
+        ],
+        "routines_first": {
+          "title": "Petit-dejeuner du matin",
+          "minutes_until_next_occurrence": 10,
+          "temporal_label": "maintenant"
+        }
+      },
+      "evidence": {
+        "pytest_tests": [
+          "tests/test_memory_sync.py::test_reorientation_context_uses_knowledge_graph_patient_support_signals",
+          "tests/test_memory_sync.py::test_reorientation_context_computes_routine_temporal_priority"
+        ]
+      }
+    },
+    {
+      "id": "CONV-001",
+      "snapshot_ref": "rose_home_support",
+      "title": "Reponse conversationnelle rassurante sur une visite prevue",
+      "goal": "Verifier que l'orchestrateur repond avec une formulation simple, ancree dans les souvenirs et les anchors du domicile.",
+      "kind": "automated_reference",
+      "layer": "conversation.orchestrator",
+      "input": {
+        "patient_id": "rose",
+        "question": "Est-ce que Claire vient aujourd'hui ?",
+        "reference_datetime": "2026-04-05T11:45:00",
+        "fake_backend_answer": "Oui, Claire vient pour le dejeuner. Vous etes chez vous rue des Lilas et tout est en ordre."
+      },
+      "expected": {
+        "answer_starts_with": "Oui, Claire vient",
+        "prompt_user_message_contains": [
+          "Claire Martin",
+          "rue des Lilas",
+          "Dejeuner du dimanche avec Claire"
+        ],
+        "trace": {
+          "has_retrieved_memories": true
+        }
+      },
+      "evidence": {
+        "pytest_tests": [
+          "tests/test_conversation.py::test_conversation_orchestrator_runs_retrieval_prompt_and_generation_loop"
+        ]
+      }
+    },
+    {
+      "id": "REO-101",
+      "snapshot_ref": "jean_care_home",
+      "title": "Reorientation en unite protegee lors d'une angoisse de fin d'apres-midi",
+      "goal": "Montrer que Memento peut rappeler le lieu actuel, le proche attendu et la prochaine routine apaisante pour un resident en institution.",
+      "kind": "manual_demo",
+      "layer": "memory.reorientation",
+      "input": {
+        "patient_id": "jean",
+        "query": "Je dois rentrer a la maison, ou suis-je ?",
+        "top_k": 3,
+        "reference_datetime": "2026-04-07T16:20:00"
+      },
+      "expected": {
+        "anchors_contains": [
+          "Vous etes a la residence des Tilleuls, dans votre chambre au premier etage."
+        ],
+        "trusted_people_first": {
+          "name": "Elise Morel"
+        },
+        "routines_first": {
+          "title": "Cafe de l'apres-midi",
+          "temporal_label": "maintenant"
+        },
+        "response_style": "reassuring_and_concrete"
+      },
+      "evidence": {
+        "manual_checks": [
+          "Le contexte doit citer la residence, la chambre ou un repere institutionnel clair.",
+          "La reponse ne doit pas contredire brutalement le patient.",
+          "Le prochain repere temporel doit etre concret et proche."
+        ]
+      }
+    },
+    {
+      "id": "MEM-101",
+      "snapshot_ref": "jean_care_home",
+      "title": "Rappel d'une activite valorisante liee a l'identite passee",
+      "goal": "Verifier qu'une question sur les voitures ou le travail retrouve un souvenir identitaire positif plutot qu'une simple fiche patient.",
+      "kind": "manual_demo",
+      "layer": "memory.recall",
+      "input": {
+        "patient_id": "jean",
+        "query": "Pourquoi est-ce que j'aime tant les voitures anciennes ?",
+        "top_k": 2
+      },
+      "expected": {
+        "top_hit_source_label": "Episode",
+        "top_hit_title_contains": [
+          "Discussion autour des voitures anciennes"
+        ],
+        "related_places_contains": [
+          "Coin atelier"
+        ]
+      },
+      "evidence": {
+        "manual_checks": [
+          "Le souvenir doit soutenir l'identite de Jean comme ancien mecanicien.",
+          "Le resultat doit etre plus riche qu'une simple information biographique."
+        ]
+      }
+    },
+    {
+      "id": "CONV-201",
+      "snapshot_ref": "amina_family_home",
+      "title": "Reponse conversationnelle autour du conjoint et d'une routine familiale",
+      "goal": "Montrer un cas tres quotidien ou l'assistant rassure Amina en mentionnant Samir et la routine du the ou du marche.",
+      "kind": "manual_demo",
+      "layer": "conversation.orchestrator",
+      "input": {
+        "patient_id": "amina",
+        "question": "Samir est avec moi ?",
+        "reference_datetime": "2026-04-08T16:55:00",
+        "fake_backend_answer": "Oui, Samir est avec vous a la maison. Vous allez bientot prendre le the ensemble dans le salon."
+      },
+      "expected": {
+        "answer_contains": [
+          "Samir",
+          "maison",
+          "the"
+        ],
+        "prompt_user_message_contains": [
+          "Vous vivez avec Samir dans votre maison a Villeurbanne.",
+          "The de fin d'apres-midi"
+        ]
+      },
+      "evidence": {
+        "manual_checks": [
+          "La reponse doit commencer par le repere conjugal.",
+          "Le langage doit rester simple, chaleureux et tres concret."
+        ]
+      }
+    },
+    {
+      "id": "REO-201",
+      "snapshot_ref": "amina_family_home",
+      "title": "Reorientation apres une sieste avec projection vers un appel familial",
+      "goal": "Verifier qu'une question sur la fille declenche un rappel des appels ou visites prevus, sans surcharger la reponse.",
+      "kind": "manual_demo",
+      "layer": "memory.reorientation",
+      "input": {
+        "patient_id": "amina",
+        "query": "Je cherche Leila, elle vient quand ?",
+        "top_k": 3,
+        "reference_datetime": "2026-04-07T18:40:00"
+      },
+      "expected": {
+        "trusted_people_contains": [
+          "Leila Haddad",
+          "Samir Ben Salem"
+        ],
+        "routines_contains": [
+          "Appel video avec Leila"
+        ],
+        "response_style": "brief_reassuring_future_anchor"
+      },
+      "evidence": {
+        "manual_checks": [
+          "Le contexte doit proposer le prochain appel comme repere concret.",
+          "La reponse doit rester courte pour eviter la surcharge cognitive."
+        ]
+      }
+    }
+  ]
+}

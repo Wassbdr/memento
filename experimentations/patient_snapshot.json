@@ -2,20 +2,159 @@
   "patient": {
     "patient_id": "rose",
     "display_name": "Rose Martin",
-    "preferred_name": "Mamie Rose",
-    "care_notes": ["Rassurer avant de recontextualiser."],
-    "anchors": ["Appartement rue des Lilas"]
+    "preferred_name": "Madame Rose",
+    "care_notes": [
+      "Rassurer avant de recontextualiser et eviter de contredire brutalement.",
+      "Parler lentement avec des phrases courtes et concretes.",
+      "Proposer un repere immediat avant de donner plusieurs informations."
+    ],
+    "anchors": [
+      "Vous vivez dans votre appartement rue des Lilas a Lyon.",
+      "Claire, votre fille, passe souvent le dimanche midi.",
+      "Votre fauteuil bleu est pres de la bibliotheque dans le salon."
+    ]
   },
   "people": [
     {
       "person_id": "claire",
       "name": "Claire Martin",
       "relationship_to_patient": "sa fille",
-      "notes": "Vient le dimanche.",
-      "emotional_significance": 0.95
+      "notes": "Organise les rendez-vous, fait les courses et vient souvent le dimanche pour dejeuner.",
+      "emotional_significance": 0.98
+    },
+    {
+      "person_id": "lucas",
+      "name": "Lucas Martin",
+      "relationship_to_patient": "son petit-fils",
+      "notes": "Passe le mercredi apres les cours et aide a regler la television.",
+      "emotional_significance": 0.82
+    },
+    {
+      "person_id": "sophie",
+      "name": "Sophie Benali",
+      "relationship_to_patient": "son aide a domicile",
+      "notes": "Vient le matin en semaine pour aider au petit-dejeuner et aux medicaments.",
+      "emotional_significance": 0.76
     }
   ],
-  "places": [],
-  "routines": [],
-  "episodes": []
+  "places": [
+    {
+      "place_id": "home_living_room",
+      "name": "Salon",
+      "category": "home_room",
+      "notes": "Fauteuil bleu, bibliotheque en bois clair et photos de famille sur la commode."
+    },
+    {
+      "place_id": "home_kitchen",
+      "name": "Cuisine",
+      "category": "home_room",
+      "notes": "Petite table ronde pres de la fenetre, tasse rouge preferee de Rose."
+    },
+    {
+      "place_id": "bakery",
+      "name": "Boulangerie du coin",
+      "category": "neighborhood_place",
+      "notes": "A deux rues de l'appartement, connue pour les tartelettes au citron."
+    }
+  ],
+  "routines": [
+    {
+      "routine_id": "breakfast",
+      "title": "Petit-dejeuner du matin",
+      "schedule": "Tous les jours a 08:00",
+      "description": "The leger dans la tasse rouge avec deux biscottes et de la confiture d'abricot.",
+      "cue": "La bouilloire siffle dans la cuisine.",
+      "support_strategy": "Inviter Rose a s'asseoir a la table ronde et lui montrer la tasse rouge.",
+      "place_id": "home_kitchen"
+    },
+    {
+      "routine_id": "medication_weekday",
+      "title": "Prise des medicaments du matin",
+      "schedule": "Du lundi au vendredi a 09:00",
+      "description": "Sophie prepare le pilulier apres le petit-dejeuner.",
+      "cue": "Le pilulier bleu est pose a cote de la corbeille a pain.",
+      "support_strategy": "Nommer Sophie et rappeler que les comprimes viennent apres le the.",
+      "place_id": "home_kitchen"
+    },
+    {
+      "routine_id": "sunday_lunch",
+      "title": "Dejeuner du dimanche",
+      "schedule": "Le dimanche a 12:30",
+      "description": "Claire vient partager le repas et apporte souvent un dessert.",
+      "cue": "Mettre la nappe claire sur la table avant midi.",
+      "support_strategy": "Rappeler que Claire arrive apres la matinee et qu'il n'y a rien a preparer seule.",
+      "place_id": "home_kitchen"
+    }
+  ],
+  "episodes": [
+    {
+      "episode_id": "ep_sunday_tarte",
+      "title": "Dejeuner du dimanche avec Claire",
+      "narrative": "Claire a apporte une tarte aux pommes et a dejeuner avec Rose dans la cuisine. Le repas etait calme et joyeux.",
+      "happened_on": "2026-03-29",
+      "people_ids": [
+        "claire"
+      ],
+      "place_id": "home_kitchen",
+      "emotions": [
+        {
+          "label": "joie",
+          "valence": 0.92,
+          "intensity": 0.8,
+          "notes": "Rose etait detendue pendant le repas."
+        }
+      ],
+      "tags": [
+        "famille",
+        "repas",
+        "dimanche"
+      ]
+    },
+    {
+      "episode_id": "ep_lucas_wednesday",
+      "title": "Passage de Lucas apres les cours",
+      "narrative": "Lucas est passe en fin d'apres-midi, a repare la television et a bu un jus d'orange avec Rose dans le salon.",
+      "happened_on": "2026-04-01",
+      "people_ids": [
+        "lucas"
+      ],
+      "place_id": "home_living_room",
+      "emotions": [
+        {
+          "label": "fierte",
+          "valence": 0.74,
+          "intensity": 0.6,
+          "notes": "Rose aime raconter que Lucas se debrouille bien."
+        }
+      ],
+      "tags": [
+        "famille",
+        "television",
+        "mercredi"
+      ]
+    },
+    {
+      "episode_id": "ep_bakery_walk",
+      "title": "Sortie a la boulangerie",
+      "narrative": "Sophie a accompagne Rose a la boulangerie du coin pour acheter du pain frais et une tartelette au citron.",
+      "happened_on": "2026-04-03",
+      "people_ids": [
+        "sophie"
+      ],
+      "place_id": "bakery",
+      "emotions": [
+        {
+          "label": "apaisement",
+          "valence": 0.68,
+          "intensity": 0.55,
+          "notes": "La promenade courte dans le quartier rassure Rose."
+        }
+      ],
+      "tags": [
+        "sortie",
+        "quartier",
+        "courses"
+      ]
+    }
+  ]
 }
