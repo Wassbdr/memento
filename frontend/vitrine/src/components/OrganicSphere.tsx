@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, Suspense } from "react";
+import { useEffect, useMemo, useRef, Suspense, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
@@ -7,7 +7,6 @@ export type SphereState = "idle" | "listening" | "speaking";
 
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const SPHERE_COUNT = 9000;
 const SPHERE_RADIUS = 1.54;
 
 const POINT_VERT = /* glsl */ `
@@ -150,14 +149,14 @@ function getBandAverage(
   return sum / (end - start + 1) / 255;
 }
 
-function buildSphereBuffers(): SphereBuffers {
-  const positions = new Float32Array(SPHERE_COUNT * 3);
-  const sizes = new Float32Array(SPHERE_COUNT);
-  const normals = new Float32Array(SPHERE_COUNT * 3);
-  const seeds = new Float32Array(SPHERE_COUNT);
+function buildSphereBuffers(pointCount: number): SphereBuffers {
+  const positions = new Float32Array(pointCount * 3);
+  const sizes = new Float32Array(pointCount);
+  const normals = new Float32Array(pointCount * 3);
+  const seeds = new Float32Array(pointCount);
 
-  for (let i = 0; i < SPHERE_COUNT; i += 1) {
-    const t = (i + 0.5) / SPHERE_COUNT;
+  for (let i = 0; i < pointCount; i += 1) {
+    const t = (i + 0.5) / pointCount;
     const phi = Math.acos(1 - 2 * t);
     const theta = i * GOLDEN_ANGLE;
 
@@ -187,9 +186,10 @@ function buildSphereBuffers(): SphereBuffers {
 
 interface AnimatedSphereProps {
   state: SphereState;
+  reducedMotion: boolean;
 }
 
-function AnimatedSphere({ state }: AnimatedSphereProps) {
+function AnimatedSphere({ state, reducedMotion }: AnimatedSphereProps) {
   const groupRef = useRef<THREE.Group | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -290,17 +290,19 @@ function AnimatedSphere({ state }: AnimatedSphereProps) {
       cancelled = true;
       stopCapture();
     };
-  }, [state !== "idle"]);
+  }, [state]);
+
+  const sphereCount = reducedMotion ? 5600 : 8600;
 
   const sphereGeo = useMemo(() => {
-    const { positions, sizes, normals, seeds } = buildSphereBuffers();
+    const { positions, sizes, normals, seeds } = buildSphereBuffers(sphereCount);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("aBaseSize", new THREE.BufferAttribute(sizes, 1));
     geometry.setAttribute("aNormal", new THREE.BufferAttribute(normals, 3));
     geometry.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
     return geometry;
-  }, []);
+  }, [sphereCount]);
 
   const mat = useMemo(
     () =>
@@ -316,6 +318,9 @@ function AnimatedSphere({ state }: AnimatedSphereProps) {
       }),
     [uniforms],
   );
+
+  useEffect(() => () => sphereGeo.dispose(), [sphereGeo]);
+  useEffect(() => () => mat.dispose(), [mat]);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
@@ -381,26 +386,27 @@ function AnimatedSphere({ state }: AnimatedSphereProps) {
 
     const activity = isActive ? spectral + levelStateRef.current * 0.45 : idleLevel;
 
-    const targetDeform = clamp01(0.06 + activity * 0.72);
-    const targetPulse = clamp01(0.045 + activity * 0.8);
-    const targetGlow = clamp01(0.16 + activity * 0.58);
+    const motionFactor = reducedMotion ? 0.45 : 1;
+    const targetDeform = clamp01(0.05 + activity * 0.72 * motionFactor);
+    const targetPulse = clamp01(0.04 + activity * 0.8 * motionFactor);
+    const targetGlow = clamp01(0.13 + activity * 0.58 * motionFactor);
 
     uniforms.uBands.value.lerp(bands, 0.1);
     uniforms.uLevel.value += (levelStateRef.current - uniforms.uLevel.value) * 0.11;
 
-    uniforms.uDeform.value += (targetDeform - uniforms.uDeform.value) * 0.03;
-    uniforms.uPulse.value += (targetPulse - uniforms.uPulse.value) * 0.04;
-    uniforms.uGlow.value += (targetGlow - uniforms.uGlow.value) * 0.035;
+    uniforms.uDeform.value += (targetDeform - uniforms.uDeform.value) * (reducedMotion ? 0.02 : 0.03);
+    uniforms.uPulse.value += (targetPulse - uniforms.uPulse.value) * (reducedMotion ? 0.025 : 0.04);
+    uniforms.uGlow.value += (targetGlow - uniforms.uGlow.value) * (reducedMotion ? 0.022 : 0.035);
 
     if (groupRef.current) {
-      const sway = isActive ? 0 : Math.sin(t * 0.36) * 0.01;
+      const sway = isActive || reducedMotion ? 0 : Math.sin(t * 0.36) * 0.01;
       groupRef.current.rotation.x = sway * 0.55;
       groupRef.current.rotation.z = sway * 0.35;
 
       const breathSpeed = isActive ? 0.55 + uniforms.uPulse.value * 1.1 : 0.42;
       const breathAmp = isActive
-        ? 0.0018 + uniforms.uPulse.value * 0.0046
-        : 0.0032 + uniforms.uPulse.value * 0.0016;
+        ? 0.0018 + uniforms.uPulse.value * (reducedMotion ? 0.0022 : 0.0046)
+        : 0.0032 + uniforms.uPulse.value * (reducedMotion ? 0.0008 : 0.0016);
       const breath =
         1 + Math.sin(t * breathSpeed) * breathAmp;
       groupRef.current.scale.setScalar(breath);
@@ -421,23 +427,72 @@ interface OrganicSphereProps {
 }
 
 export default function OrganicSphere({ state = "idle" }: OrganicSphereProps) {
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [compactViewport, setCompactViewport] = useState(false);
+
+  useEffect(() => {
+    const mqMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const mqCompact = window.matchMedia("(max-width: 900px)");
+
+    const sync = () => {
+      setReducedMotion(mqMotion.matches);
+      setCompactViewport(mqCompact.matches);
+    };
+
+    sync();
+
+    const add = (mql: MediaQueryList, handler: () => void) => {
+      if (mql.addEventListener) {
+        mql.addEventListener("change", handler);
+      } else {
+        mql.addListener(handler);
+      }
+    };
+
+    const remove = (mql: MediaQueryList, handler: () => void) => {
+      if (mql.removeEventListener) {
+        mql.removeEventListener("change", handler);
+      } else {
+        mql.removeListener(handler);
+      }
+    };
+
+    add(mqMotion, sync);
+    add(mqCompact, sync);
+
+    return () => {
+      remove(mqMotion, sync);
+      remove(mqCompact, sync);
+    };
+  }, []);
+
+  const dpr = useMemo<[number, number]>(() => {
+    const pixelRatio = window.devicePixelRatio || 1;
+    const cap = compactViewport ? 1.45 : 1.9;
+    return [1, Math.min(pixelRatio, cap)];
+  }, [compactViewport]);
+
+  const bloomIntensity = reducedMotion ? 1.35 : compactViewport ? 2.0 : 2.75;
+
   return (
     <Canvas
       camera={{ position: [0, 0, 5.3], fov: 42 }}
-      gl={{ antialias: true, alpha: true }}
+      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+      dpr={dpr}
+      performance={{ min: 0.75 }}
       style={{ background: "transparent", width: "100%", height: "100%" }}
       onCreated={({ gl }) => {
         gl.setClearColor(0x000000, 0);
       }}
     >
       <Suspense fallback={null}>
-        <AnimatedSphere state={state} />
+        <AnimatedSphere state={state} reducedMotion={reducedMotion} />
 
         <EffectComposer>
           <Bloom
             luminanceThreshold={0.02}
             luminanceSmoothing={0.2}
-            intensity={3.0}
+            intensity={bloomIntensity}
             mipmapBlur
           />
         </EffectComposer>
