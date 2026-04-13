@@ -1,0 +1,263 @@
+{
+  "suite_id": "memento_realistic_use_cases_v1",
+  "created_on": "2026-04-13",
+  "purpose": "Fournir des cas d'usage realistes pour valider reassurance, reorientation et rappel autobiographique.",
+  "source_snapshots": [
+    "rose_home_support",
+    "jean_care_home",
+    "amina_family_home"
+  ],
+  "global_response_policy": {
+    "tone": "reassuring_and_concrete",
+    "max_sentences": 3,
+    "must_not": [
+      "invent_unseen_people",
+      "contradict_brutally",
+      "overload_with_many_instructions"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "UC-001",
+      "snapshot_ref": "rose_home_support",
+      "layer": "memory.reorientation",
+      "goal": "Gerer une confusion matinale avec repere domicile + routine immediate.",
+      "input": {
+        "patient_id": "rose",
+        "utterance": "Je suis perdue ce matin, Sophie est ou ?",
+        "reference_datetime": "2026-04-06T08:55:00",
+        "top_k": 3
+      },
+      "expected_context": {
+        "anchors_any": [
+          "appartement rue des Lilas"
+        ],
+        "trusted_people_any": [
+          "Sophie Benali",
+          "Claire Martin"
+        ],
+        "routines_any": [
+          "Prise des medicaments du matin",
+          "Petit-dejeuner du matin"
+        ]
+      },
+      "response_requirements": {
+        "must_start_with_reassurance": true,
+        "must_include_temporal_anchor": true
+      }
+    },
+    {
+      "id": "UC-002",
+      "snapshot_ref": "rose_home_support",
+      "layer": "memory.recall",
+      "goal": "Identifier correctement un proche mentionne de facon indirecte.",
+      "input": {
+        "patient_id": "rose",
+        "utterance": "Le jeune homme venu hier pour la tele, c'etait qui ?",
+        "reference_datetime": "2026-04-02T10:00:00",
+        "top_k": 2
+      },
+      "expected_context": {
+        "episodes_any": [
+          "Passage de Lucas apres les cours"
+        ],
+        "trusted_people_any": [
+          "Lucas Martin"
+        ],
+        "places_any": [
+          "Salon"
+        ]
+      },
+      "response_requirements": {
+        "must_include_relationship_hint": true,
+        "must_avoid_generic_answer": true
+      }
+    },
+    {
+      "id": "UC-003",
+      "snapshot_ref": "rose_home_support",
+      "layer": "conversation.orchestrator",
+      "goal": "Rassurer sur une visite familiale proche sans surcharge.",
+      "input": {
+        "patient_id": "rose",
+        "utterance": "Claire m'a oubliee aujourd'hui ?",
+        "reference_datetime": "2026-04-05T11:50:00",
+        "top_k": 3
+      },
+      "expected_context": {
+        "trusted_people_any": [
+          "Claire Martin"
+        ],
+        "routines_any": [
+          "Dejeuner du dimanche"
+        ],
+        "anchors_any": [
+          "appartement rue des Lilas"
+        ]
+      },
+      "response_requirements": {
+        "must_include_future_near_anchor": true,
+        "must_not_sound_uncertain_without_reason": true
+      }
+    },
+    {
+      "id": "UC-004",
+      "snapshot_ref": "jean_care_home",
+      "layer": "memory.reorientation",
+      "goal": "Desescalader une angoisse de fin d'apres-midi en institution.",
+      "input": {
+        "patient_id": "jean",
+        "utterance": "Je dois rentrer chez moi tout de suite.",
+        "reference_datetime": "2026-04-07T16:25:00",
+        "top_k": 3
+      },
+      "expected_context": {
+        "anchors_any": [
+          "residence des Tilleuls"
+        ],
+        "routines_any": [
+          "Cafe de l'apres-midi"
+        ],
+        "trusted_people_any": [
+          "Elise Morel",
+          "Ines Dupont"
+        ]
+      },
+      "response_requirements": {
+        "must_avoid_hard_contradiction": true,
+        "must_include_immediate_next_step": true
+      }
+    },
+    {
+      "id": "UC-005",
+      "snapshot_ref": "jean_care_home",
+      "layer": "memory.recall",
+      "goal": "Soutenir l'identite personnelle via souvenir positif specifique.",
+      "input": {
+        "patient_id": "jean",
+        "utterance": "J'etais bon mecanicien ou je me trompe ?",
+        "reference_datetime": "2026-04-07T10:10:00",
+        "top_k": 2
+      },
+      "expected_context": {
+        "episodes_any": [
+          "Discussion autour des voitures anciennes"
+        ],
+        "places_any": [
+          "Coin atelier"
+        ],
+        "emotions_any": [
+          "fierte"
+        ]
+      },
+      "response_requirements": {
+        "must_include_identity_support": true,
+        "must_be_short": true
+      }
+    },
+    {
+      "id": "UC-006",
+      "snapshot_ref": "jean_care_home",
+      "layer": "conversation.orchestrator",
+      "goal": "Preparer sereinement le traitement du soir.",
+      "input": {
+        "patient_id": "jean",
+        "utterance": "Qui vient ce soir pour mes comprimes ?",
+        "reference_datetime": "2026-04-07T18:20:00",
+        "top_k": 3
+      },
+      "expected_context": {
+        "trusted_people_any": [
+          "Ines Dupont"
+        ],
+        "routines_any": [
+          "Traitement du soir",
+          "Cafe de l'apres-midi"
+        ]
+      },
+      "response_requirements": {
+        "must_include_person_name": true,
+        "must_keep_single_instruction_flow": true
+      }
+    },
+    {
+      "id": "UC-007",
+      "snapshot_ref": "amina_family_home",
+      "layer": "memory.reorientation",
+      "goal": "Rassurer apres sieste sur la presence du conjoint.",
+      "input": {
+        "patient_id": "amina",
+        "utterance": "Samir est sorti ? Je suis seule ?",
+        "reference_datetime": "2026-04-08T16:55:00",
+        "top_k": 3
+      },
+      "expected_context": {
+        "trusted_people_any": [
+          "Samir Ben Salem"
+        ],
+        "routines_any": [
+          "The de fin d'apres-midi"
+        ],
+        "places_any": [
+          "Salon"
+        ]
+      },
+      "response_requirements": {
+        "must_include_spousal_anchor": true,
+        "must_include_concrete_sensory_cue": true
+      }
+    },
+    {
+      "id": "UC-008",
+      "snapshot_ref": "amina_family_home",
+      "layer": "conversation.orchestrator",
+      "goal": "Donner un repere clair sur le prochain appel de la fille.",
+      "input": {
+        "patient_id": "amina",
+        "utterance": "Je peux parler a Leila ce soir ?",
+        "reference_datetime": "2026-04-07T18:50:00",
+        "top_k": 3
+      },
+      "expected_context": {
+        "trusted_people_any": [
+          "Leila Haddad",
+          "Samir Ben Salem"
+        ],
+        "routines_any": [
+          "Appel video avec Leila"
+        ]
+      },
+      "response_requirements": {
+        "must_include_time_projection": true,
+        "must_not_add_unknown_logistics": true
+      }
+    },
+    {
+      "id": "UC-009",
+      "snapshot_ref": "amina_family_home",
+      "layer": "memory.reorientation",
+      "goal": "Recadrer une confusion de planning sans frustrer.",
+      "input": {
+        "patient_id": "amina",
+        "utterance": "On va au marche maintenant ?",
+        "reference_datetime": "2026-04-08T10:00:00",
+        "top_k": 3
+      },
+      "expected_context": {
+        "routines_any": [
+          "Sortie au marche"
+        ],
+        "trusted_people_any": [
+          "Samir Ben Salem"
+        ],
+        "places_any": [
+          "Marche des Gratte-Ciel"
+        ]
+      },
+      "response_requirements": {
+        "must_include_correct_schedule": true,
+        "must_keep_positive_reframe": true
+      }
+    }
+  ]
+}
