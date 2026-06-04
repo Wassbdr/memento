@@ -4,18 +4,23 @@ Memento est une prothèse cognitive vocale destinée aux patients atteints de la
 La mémoire du patient est alimentée de deux façons : par les aidants et la famille via une application dédiée, et de manière automatique en captant le contexte des interactions quotidiennes — visites, conversations, émotions — avec le consentement de chacun. Ce contexte vivant est stocké dans un graphe de mémoire personnalisé et affectif, bien au-delà de ce que peut offrir n’importe quel assistant généraliste.
 L’objectif n’est pas de guérir, mais de réduire les moments de confusion et d’angoisse, de préserver l’autonomie le plus longtemps possible, et de soulager les aidants. Dans un second temps, une couche visuelle — idéalement via des lunettes connectées — permettra à l’assistant de reconnaître les visages en temps réel et d’enrichir encore davantage le contexte de chaque interaction.
 
-# TODO:
-Micro → Whisper + VAD
-              ↓
-        LlamaIndex
-              ↓
-   ChromaDB ←→ Neo4j
-              ↓
-    Ministral 3 8B
-              ↓
-         Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
-              ↓
-           Haut-parleur
+## Architecture du pipeline
+
+```
+Microphone
+    ↓
+Whisper + VAD  (Speech-to-Text local)
+    ↓
+LlamaIndex  (orchestration RAG)
+    ↓
+ChromaDB ←→ Neo4j  (index sémantique ↔ graphe de mémoire)
+    ↓
+Ministral 3 8B  (LLM de raisonnement)
+    ↓
+Qwen3-TTS  (Text-to-Speech voix clonée)
+    ↓
+Haut-parleur
+```
 
 ## Fonctionnement de la memoire
 
