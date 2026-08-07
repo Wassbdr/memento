@@ -48,12 +48,19 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
         if self.path != "/api/health":
             self._write_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
             return
+        patient = self.server.snapshot.patient
         self._write_json(
             HTTPStatus.OK,
             {
                 "status": "ok",
                 "snapshot_file": self.server.snapshot_file,
-                "patient_id": self.server.snapshot.patient.patient_id,
+                "patient": {
+                    "patientId": patient.patient_id,
+                    "displayName": patient.display_name,
+                    "preferredName": patient.preferred_name,
+                    "anchors": list(patient.anchors),
+                    "careNotes": list(patient.care_notes),
+                },
             },
         )
 

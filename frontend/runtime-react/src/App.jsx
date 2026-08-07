@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const LEGACY_LLM_MODEL_LABEL = "Ministral 3 8B";
 
@@ -21,14 +21,14 @@ const DEFAULT_SNAPSHOT = {
       person_id: "claire",
       name: "Claire Martin",
       relationship_to_patient: "sa fille",
-      notes: "Passe le dimanche pour le dejeuner.",
+      notes: "Passe le dimanche pour le déjeuner.",
       emotional_significance: 0.98,
     },
     {
       person_id: "lucas",
       name: "Lucas",
       relationship_to_patient: "son petit-fils",
-      notes: "Appelle en video le mercredi soir.",
+      notes: "Appelle en vidéo le mercredi soir.",
       emotional_significance: 0.86,
     },
   ],
@@ -43,11 +43,11 @@ const DEFAULT_SNAPSHOT = {
   routines: [
     {
       routine_id: "lunch_sunday",
-      title: "Dejeuner du dimanche",
+      title: "Déjeuner du dimanche",
       schedule: "dimanche midi",
       description: "Claire vient partager le repas avec Rose.",
       cue: "Mettre la nappe claire sur la table.",
-      support_strategy: "Rappeler que Claire arrive apres la matinee.",
+      support_strategy: "Rappeler que Claire arrive après la matinée.",
       place_id: "home",
     },
   ],
@@ -55,7 +55,7 @@ const DEFAULT_SNAPSHOT = {
     {
       episode_id: "ep_family_lunch",
       title: "Repas de famille",
-      narrative: "Rose aime les dejeuners calmes avec Claire dans le salon.",
+      narrative: "Rose aime les déjeuners calmes avec Claire dans le salon.",
       happened_on: "2026-03-30",
       people_ids: ["claire"],
       place_id: "home",
@@ -64,10 +64,10 @@ const DEFAULT_SNAPSHOT = {
           label: "apaisement",
           valence: 0.9,
           intensity: 0.7,
-          notes: "La presence de Claire rassure Rose.",
+          notes: "La présence de Claire rassure Rose.",
         },
       ],
-      tags: ["famille", "repere", "dimanche"],
+      tags: ["famille", "repère", "dimanche"],
     },
   ],
 };
@@ -96,9 +96,10 @@ const DEFAULT_SETTINGS = {
 
 function App() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [showConfig, setShowConfig] = useState(false);
   const [turns, setTurns] = useState([]);
   const [history, setHistory] = useState([]);
-  const [status, setStatus] = useState("Pret a ecouter");
+  const [status, setStatus] = useState("Prêt à écouter");
   const [error, setError] = useState("");
   const [question, setQuestion] = useState("");
   const [health, setHealth] = useState(null);
@@ -108,6 +109,8 @@ function App() {
   const [isSending, setIsSending] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechLevel, setSpeechLevel] = useState(0);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [copiedTurnId, setCopiedTurnId] = useState(null);
 
   const recorderRef = useRef(null);
   const orbRef = useRef(null);
@@ -119,6 +122,10 @@ function App() {
   const latestAutoPlayIdRef = useRef("");
   const speechLevelRef = useRef(0);
   const orbMotionFrameRef = useRef(0);
+  const recordingTimerRef = useRef(null);
+  const conversationEndRef = useRef(null);
+  const isRecordingRef = useRef(false);
+  const isSendingRef = useRef(false);
 
   const parsedSnapshot = useMemo(() => {
     try {
@@ -136,24 +143,23 @@ function App() {
     patient?.display_name ||
     "Memento";
 
+  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
+  useEffect(() => { isSendingRef.current = isSending; }, [isSending]);
+
   useEffect(() => {
     const controller = new AbortController();
-
     async function fetchHealth() {
       try {
         const response = await fetch(`${settings.apiBaseUrl}/api/health`, {
           signal: controller.signal,
         });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
         setHealth(payload);
       } catch {
         setHealth(null);
       }
     }
-
     fetchHealth();
     return () => controller.abort();
   }, [settings.apiBaseUrl]);
@@ -165,62 +171,39 @@ function App() {
       setLlmModelsError("");
       return undefined;
     }
-
     const controller = new AbortController();
-
     async function fetchModels() {
       try {
-        const response = await fetch(tagsUrl, {
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
+        const response = await fetch(tagsUrl, { signal: controller.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
         const models = extractModelNames(payload);
         setLlmModels(models);
         setLlmModelsError("");
-
         if (models.length > 0) {
           setSettings((current) => {
-            const normalizedCurrentModel = current.llmModel.trim();
-            if (
-              normalizedCurrentModel &&
-              normalizedCurrentModel !== LEGACY_LLM_MODEL_LABEL
-            ) {
-              return current;
-            }
-            return {
-              ...current,
-              llmModel: models[0],
-            };
+            const normalized = current.llmModel.trim();
+            if (normalized && normalized !== LEGACY_LLM_MODEL_LABEL) return current;
+            return { ...current, llmModel: models[0] };
           });
         }
-      } catch (requestError) {
-        if (controller.signal.aborted) {
-          return;
-        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
         setLlmModels([]);
-        setLlmModelsError(requestError.message || "Impossible de charger les modeles LLM.");
+        setLlmModelsError(err.message || "Impossible de charger les modèles LLM.");
       }
     }
-
     fetchModels();
     return () => controller.abort();
   }, [settings.llmBaseUrl]);
 
   useEffect(() => {
-    return () => {
-      stopAssistantPlayback();
-    };
+    return () => { stopAssistantPlayback(); };
   }, []);
 
   useEffect(() => {
-    const latestTurn = turns[0];
-    if (!latestTurn?.audioUrl || latestTurn.playbackId === latestAutoPlayIdRef.current) {
-      return;
-    }
+    const latestTurn = turns[turns.length - 1];
+    if (!latestTurn?.audioUrl || latestTurn.playbackId === latestAutoPlayIdRef.current) return;
     latestAutoPlayIdRef.current = latestTurn.playbackId;
     void playAssistantAudio(latestTurn.audioUrl);
   }, [turns]);
@@ -231,10 +214,7 @@ function App() {
 
   useEffect(() => {
     const orbNode = orbRef.current;
-    if (!orbNode) {
-      return undefined;
-    }
-
+    if (!orbNode) return undefined;
     const mode = isSpeaking
       ? "speaking"
       : isSending
@@ -243,7 +223,6 @@ function App() {
           ? "recording"
           : "idle";
     const startAt = performance.now();
-
     const tick = (timestamp) => {
       const seconds = (timestamp - startAt) / 1000;
       const liveSpeechLevel = speechLevelRef.current;
@@ -251,7 +230,6 @@ function App() {
         mode === "speaking" ? 0.94 : mode === "thinking" ? 0.72 : mode === "recording" ? 0.56 : 0.22;
       const speechBoost = mode === "speaking" ? liveSpeechLevel * 0.9 : 0;
       const wave = motionStrength + speechBoost;
-
       const stageX =
         Math.sin(seconds * 0.54 + 0.35) * (2.4 + wave * 2.2) +
         Math.sin(seconds * 1.28 + 2.1) * (0.8 + wave * 0.7);
@@ -278,7 +256,6 @@ function App() {
         liveSpeechLevel * 0.045;
       const glow = 0.52 + motionStrength * 0.34 + speechBoost * 0.2;
       const spectrumTilt = Math.sin(seconds * 1.18 + 0.5) * (3 + wave * 7.5);
-
       orbNode.style.setProperty("--orb-stage-x", `${stageX.toFixed(2)}px`);
       orbNode.style.setProperty("--orb-stage-y", `${stageY.toFixed(2)}px`);
       orbNode.style.setProperty("--orb-stage-rotate", `${stageRotate.toFixed(2)}deg`);
@@ -293,10 +270,8 @@ function App() {
       orbNode.style.setProperty("--orb-glow", glow.toFixed(3));
       orbNode.style.setProperty("--orb-wave", wave.toFixed(3));
       orbNode.style.setProperty("--orb-spectrum-tilt", `${spectrumTilt.toFixed(2)}deg`);
-
       orbMotionFrameRef.current = requestAnimationFrame(tick);
     };
-
     orbMotionFrameRef.current = requestAnimationFrame(tick);
     return () => {
       if (orbMotionFrameRef.current) {
@@ -306,12 +281,72 @@ function App() {
     };
   }, [isRecording, isSending, isSpeaking]);
 
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+    } else {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      setRecordingSeconds(0);
+    }
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+    };
+  }, [isRecording]);
+
+  useEffect(() => {
+    if (turns.length > 0 && conversationEndRef.current) {
+      conversationEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [turns.length]);
+
+  // Space = push-to-talk (hold = record, release = send)
+  useEffect(() => {
+    let spaceDown = false;
+
+    function handleKeyDown(event) {
+      if (event.code !== "Space" || event.repeat) return;
+      if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
+      if (isSendingRef.current) return;
+      event.preventDefault();
+      if (!isRecordingRef.current && !spaceDown) {
+        spaceDown = true;
+        void startRecording();
+      }
+    }
+
+    function handleKeyUp(event) {
+      if (event.code !== "Space") return;
+      if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
+      if (!spaceDown) return;
+      event.preventDefault();
+      spaceDown = false;
+      if (isRecordingRef.current) {
+        void stopRecording();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
   function stopAssistantPlayback() {
     if (playbackFrameRef.current) {
       cancelAnimationFrame(playbackFrameRef.current);
       playbackFrameRef.current = 0;
     }
-
     const audio = playbackRef.current;
     if (audio) {
       audio.onplay = null;
@@ -321,15 +356,11 @@ function App() {
       audio.pause();
       playbackRef.current = null;
     }
-
     const context = playbackContextRef.current;
     playbackAnalyserRef.current = null;
     playbackDataRef.current = null;
     playbackContextRef.current = null;
-    if (context) {
-      void context.close().catch(() => {});
-    }
-
+    if (context) void context.close().catch(() => {});
     setIsSpeaking(false);
     setSpeechLevel(0);
   }
@@ -337,30 +368,23 @@ function App() {
   function startSpeechMeter() {
     const analyser = playbackAnalyserRef.current;
     const data = playbackDataRef.current;
-    if (!analyser || !data) {
-      return;
-    }
-
+    if (!analyser || !data) return;
     const tick = () => {
       analyser.getByteFrequencyData(data);
-      const average =
-        data.reduce((sum, value) => sum + value, 0) / Math.max(1, data.length);
+      const average = data.reduce((sum, v) => sum + v, 0) / Math.max(1, data.length);
       const normalized = Math.min(1, average / 160);
-      setSpeechLevel((current) => current * 0.58 + normalized * 0.42);
+      setSpeechLevel((c) => c * 0.58 + normalized * 0.42);
       playbackFrameRef.current = requestAnimationFrame(tick);
     };
-
     tick();
   }
 
   async function playAssistantAudio(audioUrl) {
     stopAssistantPlayback();
-
     try {
       const audio = new Audio(audioUrl);
       audio.preload = "auto";
       playbackRef.current = audio;
-
       const BrowserAudioContext = window.AudioContext || window.webkitAudioContext;
       if (BrowserAudioContext) {
         const context = new BrowserAudioContext();
@@ -369,25 +393,18 @@ function App() {
         const source = context.createMediaElementSource(audio);
         source.connect(analyser);
         analyser.connect(context.destination);
-
         playbackContextRef.current = context;
         playbackAnalyserRef.current = analyser;
         playbackDataRef.current = new Uint8Array(analyser.frequencyBinCount);
-
-        if (context.state === "suspended") {
-          await context.resume();
-        }
+        if (context.state === "suspended") await context.resume();
       }
-
       audio.onplay = () => {
         setIsSpeaking(true);
-        setStatus("Parole en cours");
+        setStatus("Parole en cours…");
         startSpeechMeter();
       };
       audio.onpause = () => {
-        if (audio.ended) {
-          return;
-        }
+        if (audio.ended) return;
         if (playbackFrameRef.current) {
           cancelAnimationFrame(playbackFrameRef.current);
           playbackFrameRef.current = 0;
@@ -395,25 +412,18 @@ function App() {
         setIsSpeaking(false);
         setSpeechLevel(0);
       };
-      audio.onended = () => {
-        stopAssistantPlayback();
-        setStatus("Pret a ecouter");
-      };
-      audio.onerror = () => {
-        stopAssistantPlayback();
-      };
-
+      audio.onended = () => { stopAssistantPlayback(); setStatus("Prêt à écouter"); };
+      audio.onerror = () => { stopAssistantPlayback(); };
       await audio.play();
-    } catch (playbackError) {
+    } catch (err) {
       stopAssistantPlayback();
-      setError(playbackError.message || "Lecture audio impossible.");
+      setError(err.message || "Lecture audio impossible.");
     }
   }
 
   async function submitTextTurn() {
     if (!question.trim()) {
       setError("Le message texte est vide.");
-      setStatus("En attente d'une question");
       return;
     }
     await sendTurn({ mode: "text", userText: question.trim() });
@@ -423,35 +433,28 @@ function App() {
   async function sendTurn({ mode, userText = "", audioBase64 = "" }) {
     const normalizedModel = settings.llmModel.trim();
     if (!normalizedModel) {
-      setError("Choisis un modele LLM exact avant d'envoyer.");
-      setStatus("Configuration incomplete");
+      setError("Choisissez un modèle LLM avant d'envoyer.");
+      setStatus("Configuration incomplète");
       return;
     }
     if (llmModels.length > 0 && !llmModels.includes(normalizedModel)) {
       setError(
-        `Modele introuvable sur le serveur: ${normalizedModel}. Utilise un identifiant exact comme ${llmModels[0]}.`
+        `Modèle introuvable sur le serveur : ${normalizedModel}. Disponibles : ${llmModels.join(", ")}.`
       );
       setStatus("Configuration invalide");
       return;
     }
-
     stopAssistantPlayback();
     setIsSending(true);
     setError("");
-    setStatus(mode === "voice" ? "Transcription et reponse en cours" : "Generation en cours");
-
+    setStatus(mode === "voice" ? "Transcription en cours…" : "Génération en cours…");
     try {
       const snapshot = JSON.parse(settings.snapshotText);
       const response = await fetch(`${settings.apiBaseUrl}/api/runtime/turn`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode,
-          userText,
-          audioBase64,
-          snapshot,
+          mode, userText, audioBase64, snapshot,
           conversationHistory: history,
           llmBaseUrl: settings.llmBaseUrl,
           llmApiKey: settings.llmApiKey,
@@ -472,12 +475,8 @@ function App() {
           ttsDeviceMap: settings.ttsDeviceMap,
         }),
       });
-
       const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || `HTTP ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       const nextTurn = {
         ...payload.turn,
         playbackId: createPlaybackId(),
@@ -486,8 +485,7 @@ function App() {
             ? `data:${payload.turn.audioMimeType};base64,${payload.turn.audioBase64}`
             : null,
       };
-
-      setTurns((current) => [nextTurn, ...current].slice(0, 12));
+      setTurns((current) => [...current, nextTurn].slice(-12));
       setHistory((current) => {
         const nextHistory = [
           ...current,
@@ -496,10 +494,10 @@ function App() {
         ];
         return nextHistory.slice(-12);
       });
-      setStatus("Reponse prete");
+      setStatus("Réponse prête");
       setHealth((current) => ({ ...(current || {}), patient: payload.patient }));
-    } catch (requestError) {
-      setError(requestError.message || "Erreur inconnue.");
+    } catch (err) {
+      setError(err.message || "Erreur inconnue.");
       setStatus("Erreur");
     } finally {
       setIsSending(false);
@@ -525,40 +523,26 @@ function App() {
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       const gain = audioContext.createGain();
       const chunks = [];
-
       processor.onaudioprocess = (event) => {
         const channel = event.inputBuffer.getChannelData(0);
         chunks.push(new Float32Array(channel));
       };
-
       source.connect(processor);
       gain.gain.value = 0;
       processor.connect(gain);
       gain.connect(audioContext.destination);
-
-      recorderRef.current = {
-        stream,
-        audioContext,
-        source,
-        processor,
-        gain,
-        chunks,
-      };
+      recorderRef.current = { stream, audioContext, source, processor, gain, chunks };
       setIsRecording(true);
-      setStatus("Ecoute en cours");
-    } catch (captureError) {
-      setError(captureError.message || "Impossible d'acceder au microphone.");
+      setStatus("Écoute en cours…");
+    } catch (err) {
+      setError(err.message || "Impossible d'accéder au microphone.");
       setStatus("Erreur micro");
     }
   }
 
   async function stopRecording() {
     const recorder = recorderRef.current;
-    if (!recorder) {
-      setIsRecording(false);
-      return;
-    }
-
+    if (!recorder) { setIsRecording(false); return; }
     recorder.processor.disconnect();
     recorder.source.disconnect();
     recorder.gain.disconnect();
@@ -567,14 +551,12 @@ function App() {
     await recorder.audioContext.close();
     recorderRef.current = null;
     setIsRecording(false);
-
     const samples = mergeChunks(recorder.chunks);
     if (samples.length === 0) {
-      setError("Aucun signal audio capture.");
-      setStatus("Pret a ecouter");
+      setError("Aucun signal audio capturé.");
+      setStatus("Prêt à écouter");
       return;
     }
-
     const wavArrayBuffer = encodeWav(samples, sampleRate);
     const audioBase64 = arrayBufferToBase64(wavArrayBuffer);
     await sendTurn({ mode: "voice", audioBase64 });
@@ -587,84 +569,136 @@ function App() {
     setHistory([]);
     setError("");
     setQuestion("");
-    setStatus("Pret a ecouter");
+    setStatus("Prêt à écouter");
   }
+
+  async function copyToClipboard(text, turnId) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedTurnId(turnId);
+      setTimeout(() => setCopiedTurnId(null), 2000);
+    } catch {
+      // clipboard unavailable
+    }
+  }
+
+  const apiConnected = Boolean(health?.status === "ok");
+
+  const orbLabel = isRecording
+    ? formatDuration(recordingSeconds)
+    : isSending
+      ? "…"
+      : isSpeaking
+        ? "♪"
+        : "●";
+
+  const orbSub = isRecording
+    ? "Relâcher pour envoyer"
+    : status;
 
   return (
     <div className="app-shell">
-      <aside className="config-panel">
+      <button
+        className="config-toggle"
+        type="button"
+        onClick={() => setShowConfig((v) => !v)}
+        title={showConfig ? "Fermer la configuration" : "Ouvrir la configuration"}
+        aria-label="Paramètres"
+      >
+        {showConfig ? "✕" : "⚙"}
+      </button>
+
+      <aside className={`config-panel ${showConfig ? "is-open" : ""}`}>
         <div className="panel-header">
-          <p className="eyebrow">Runtime Controls</p>
+          <p className="eyebrow">Paramètres</p>
           <h2>Configuration</h2>
         </div>
 
         <label className="field">
-          <span>API runtime</span>
+          <span>URL de l'API runtime</span>
           <input
             value={settings.apiBaseUrl}
-            onChange={(event) => updateSetting(setSettings, "apiBaseUrl", event.target.value)}
+            onChange={(e) => updateSetting(setSettings, "apiBaseUrl", e.target.value)}
           />
+          <small style={{ color: apiConnected ? "var(--cyan)" : "var(--pink)" }}>
+            {apiConnected ? "API connectée" : "API hors ligne"}
+          </small>
         </label>
 
         <label className="field field-large">
-          <span>Snapshot patient JSON</span>
+          <span>Snapshot patient (JSON)</span>
           <textarea
-            rows="16"
+            rows="14"
             value={settings.snapshotText}
-            onChange={(event) => updateSetting(setSettings, "snapshotText", event.target.value)}
+            onChange={(e) => updateSetting(setSettings, "snapshotText", e.target.value)}
           />
         </label>
 
         <div className="field-grid">
           <label className="field">
-            <span>LLM base URL</span>
+            <span>URL du serveur LLM</span>
             <input
               value={settings.llmBaseUrl}
-              onChange={(event) => updateSetting(setSettings, "llmBaseUrl", event.target.value)}
+              onChange={(e) => updateSetting(setSettings, "llmBaseUrl", e.target.value)}
             />
           </label>
           <label className="field">
-            <span>Modele LLM</span>
+            <span>Modèle LLM</span>
             <input
               list="llm-model-options"
               value={settings.llmModel}
-              onChange={(event) => updateSetting(setSettings, "llmModel", event.target.value)}
-              placeholder={llmModels[0] || "Ex: gemma3:4b"}
+              onChange={(e) => updateSetting(setSettings, "llmModel", e.target.value)}
+              placeholder={llmModels[0] || "Ex : gemma3:4b"}
             />
             <datalist id="llm-model-options">
-              {llmModels.map((modelName) => (
-                <option key={modelName} value={modelName} />
-              ))}
+              {llmModels.map((m) => <option key={m} value={m} />)}
             </datalist>
             {llmModels.length > 0 ? (
-              <small>
-                Modeles detectes: {llmModels.join(", ")}
-              </small>
+              <small>Disponibles : {llmModels.join(", ")}</small>
             ) : llmModelsError ? (
-              <small>Detection Ollama indisponible: {llmModelsError}</small>
+              <small>Ollama hors ligne : {llmModelsError}</small>
             ) : (
-              <small>Utilise l'identifiant exact expose par le serveur LLM.</small>
+              <small>Entrez l'identifiant exact exposé par le serveur LLM.</small>
             )}
           </label>
           <label className="field">
-            <span>Whisper</span>
+            <span>Modèle Whisper</span>
             <input
               value={settings.whisperModel}
-              onChange={(event) => updateSetting(setSettings, "whisperModel", event.target.value)}
+              onChange={(e) => updateSetting(setSettings, "whisperModel", e.target.value)}
             />
           </label>
           <label className="field">
-            <span>TTS speaker</span>
+            <span>Voix TTS</span>
             <input
               value={settings.ttsSpeaker}
-              onChange={(event) => updateSetting(setSettings, "ttsSpeaker", event.target.value)}
+              onChange={(e) => updateSetting(setSettings, "ttsSpeaker", e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span>Clé API LLM (optionnel)</span>
+            <input
+              type="password"
+              value={settings.llmApiKey}
+              onChange={(e) => updateSetting(setSettings, "llmApiKey", e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span>Température LLM</span>
+            <input
+              type="number"
+              min="0"
+              max="2"
+              step="0.05"
+              value={settings.temperature}
+              onChange={(e) => updateSetting(setSettings, "temperature", e.target.value)}
             />
           </label>
         </div>
 
         <div className="button-row">
-          <button className="secondary-button" type="button" onClick={clearConversation}>
-            Effacer
+          <button className="secondary-button full-width" type="button" onClick={clearConversation}>
+            Effacer la conversation
           </button>
         </div>
       </aside>
@@ -672,12 +706,11 @@ function App() {
       <main className="main-panel">
         <section className="hero-card">
           <div className="hero-copy">
-            <p className="eyebrow">Memento React Runtime</p>
-            <h1>Memento</h1>
+            <p className="eyebrow">Memento · Prothèse cognitive vocale</p>
+            <h1>{patientName}</h1>
             <p>
-              Clique la sphere pour parler a l&apos;assistant. Le navigateur enregistre en WAV,
-              l&apos;API Python transcrit avec Whisper, recentre avec la memoire, puis renvoie une
-              reponse et un rendu vocal.
+              Maintenez <kbd>Espace</kbd> pour parler, relâchez pour envoyer —
+              ou cliquez la sphère.
             </p>
           </div>
 
@@ -685,12 +718,11 @@ function App() {
             <button
               ref={orbRef}
               type="button"
-              className={`orb-button ${isRecording ? "is-recording" : ""} ${
-                isSending ? "is-thinking" : ""
-              } ${isSpeaking ? "is-speaking" : ""}`}
+              className={`orb-button${isRecording ? " is-recording" : ""}${isSending ? " is-thinking" : ""}${isSpeaking ? " is-speaking" : ""}`}
               onClick={toggleRecording}
               disabled={isSending}
               style={{ "--speech-level": speechLevel.toFixed(3) }}
+              aria-label={isRecording ? "Arrêter l'enregistrement" : "Démarrer l'enregistrement"}
             >
               <span className="orb-ring orb-ring-a" />
               <span className="orb-ring orb-ring-b" />
@@ -699,43 +731,44 @@ function App() {
               <span className="orb-pulse orb-pulse-a" />
               <span className="orb-pulse orb-pulse-b" />
               <span className="orb-content">
-                <strong>{patientName}</strong>
-                <small>{isRecording ? "Relacher pour envoyer" : status}</small>
+                <strong className="orb-label">{orbLabel}</strong>
+                <small>{orbSub}</small>
               </span>
             </button>
           </div>
 
           <div className="status-grid">
-            <div className="status-card">
+            <div className={`status-card${apiConnected ? " status-ok" : " status-offline"}`}>
               <span>API</span>
-              <strong>{health ? "Connectee" : "Hors ligne"}</strong>
+              <strong>{apiConnected ? "Connectée" : "Hors ligne"}</strong>
             </div>
             <div className="status-card">
-              <span>Modele LLM</span>
-              <strong>{settings.llmModel || "A choisir"}</strong>
+              <span>Modèle</span>
+              <strong className="status-model">{settings.llmModel || "—"}</strong>
             </div>
             <div className="status-card">
               <span>Mode</span>
-              <strong>{isRecording ? "Ecoute" : isSpeaking ? "Parle" : isSending ? "Reflechit" : "Pret"}</strong>
+              <strong>
+                {isRecording ? "Écoute" : isSpeaking ? "Parole" : isSending ? "Réflexion" : "Prêt"}
+              </strong>
             </div>
           </div>
         </section>
 
         <section className="composer-card">
           <div className="composer-header">
-            <h2>Message texte</h2>
-            <p>Fallback rapide si tu ne veux pas utiliser le micro.</p>
+            <h2>Saisie manuelle</h2>
+            <p>Alternative au micro — posez une question par écrit.</p>
           </div>
-
           <div className="composer-row">
             <input
               className="composer-input"
               value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ex: Qui vient dimanche ?"
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ex : Qui vient dimanche ?"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
                   void submitTextTurn();
                 }
               }}
@@ -743,83 +776,120 @@ function App() {
             <button
               className="primary-button"
               type="button"
-              onClick={() => {
-                void submitTextTurn();
-              }}
+              onClick={() => void submitTextTurn()}
               disabled={isSending}
             >
-              Envoyer
+              {isSending ? "…" : "Envoyer"}
             </button>
           </div>
-
-          {error ? <div className="error-banner">{error}</div> : null}
+          {error ? <div className="error-banner" role="alert">{error}</div> : null}
         </section>
 
         <section className="content-grid">
           <div className="conversation-panel">
             <div className="panel-header">
               <p className="eyebrow">Conversation</p>
-              <h2>Derniers tours</h2>
+              <h2>Échanges récents</h2>
+              {turns.length > 0 && (
+                <button className="clear-link" type="button" onClick={clearConversation}>
+                  Tout effacer
+                </button>
+              )}
             </div>
 
-            {turns.length === 0 ? (
+            {isSending && (
+              <div className="thinking-indicator" aria-live="polite">
+                <span className="thinking-dot" />
+                <span className="thinking-dot" />
+                <span className="thinking-dot" />
+                <span className="thinking-label">{status}</span>
+              </div>
+            )}
+
+            {turns.length === 0 && !isSending ? (
               <div className="empty-state">
-                Aucun tour encore. Utilise la sphere ou le champ texte.
+                Aucun échange pour l'instant. Utilisez la sphère ou la saisie manuelle.
               </div>
             ) : (
               turns.map((turn, index) => (
                 <article
                   className="turn-card"
-                  key={turn.playbackId || `${turn.userText}-${turn.assistantText}-${index}`}
+                  key={turn.playbackId || `turn-${index}`}
                 >
                   <div className="bubble user">
-                    <span className="bubble-label">Vous</span>
+                    <span className="bubble-label">
+                      {turn.source === "voice" ? "🎙 Vous" : "✎ Vous"}
+                    </span>
                     <p>{turn.userText}</p>
                   </div>
 
                   <div className="bubble assistant">
-                    <span className="bubble-label">Assistant</span>
+                    <div className="bubble-label-row">
+                      <span className="bubble-label">Memento</span>
+                      <button
+                        className={`copy-button${copiedTurnId === turn.playbackId ? " copied" : ""}`}
+                        type="button"
+                        onClick={() => void copyToClipboard(turn.assistantText, turn.playbackId)}
+                        title="Copier la réponse"
+                      >
+                        {copiedTurnId === turn.playbackId ? "Copié ✓" : "Copier"}
+                      </button>
+                    </div>
                     <p>{turn.assistantText}</p>
+                    {turn.audioUrl ? (
+                      <audio controls src={turn.audioUrl} className="turn-audio" />
+                    ) : null}
                   </div>
 
-                  <div className="metrics-row">
-                    <div>
-                      <span>Transcription</span>
-                      <strong>{formatMetric(turn.transcriptLatencyMs)}</strong>
+                  {turn.guardApplied && (
+                    <div className="guard-notice" role="note">
+                      ⚠ Contexte insuffisant — réponse de sécurité appliquée.
                     </div>
-                    <div>
-                      <span>Generation</span>
-                      <strong>{formatMetric(turn.generationLatencyMs)}</strong>
-                    </div>
-                    <div>
-                      <span>Synthese</span>
-                      <strong>{formatMetric(turn.synthesisLatencyMs)}</strong>
-                    </div>
-                  </div>
+                  )}
 
-                  {turn.audioUrl ? <audio controls src={turn.audioUrl} /> : null}
-                  {turn.ttsError ? <p className="inline-warning">{turn.ttsError}</p> : null}
+                  {turn.ttsError ? (
+                    <p className="inline-warning">{turn.ttsError}</p>
+                  ) : null}
 
-                  <div className="memory-zone">
-                    <p className="memory-title">Memoire mobilisee</p>
-                    <div className="memory-chip-row">
-                      {turn.retrievedMemories.length === 0 ? (
-                        <span className="memory-chip muted">Aucun souvenir remonte</span>
-                      ) : (
-                        turn.retrievedMemories.map((memory) => (
-                          <span
-                            className="memory-chip"
-                            key={`${memory.sourceLabel}-${memory.sourceDisplayName}`}
-                          >
-                            {memory.sourceLabel}: {memory.sourceDisplayName}
-                          </span>
-                        ))
-                      )}
+                  <details className="turn-details">
+                    <summary>Métriques &amp; mémoire mobilisée</summary>
+                    <div className="metrics-row">
+                      <div>
+                        <span>Transcription</span>
+                        <strong>{formatMetric(turn.transcriptLatencyMs)}</strong>
+                      </div>
+                      <div>
+                        <span>Génération</span>
+                        <strong>{formatMetric(turn.generationLatencyMs)}</strong>
+                      </div>
+                      <div>
+                        <span>Synthèse</span>
+                        <strong>{formatMetric(turn.synthesisLatencyMs)}</strong>
+                      </div>
                     </div>
-                  </div>
+                    <div className="memory-zone">
+                      <p className="memory-title">Mémoire mobilisée</p>
+                      <div className="memory-chip-row">
+                        {turn.retrievedMemories.length === 0 ? (
+                          <span className="memory-chip muted">Aucun souvenir remonté</span>
+                        ) : (
+                          turn.retrievedMemories.map((memory) => (
+                            <span
+                              className="memory-chip"
+                              key={`${memory.sourceLabel}-${memory.sourceDisplayName}`}
+                              title={memory.summary}
+                            >
+                              {memory.sourceLabel} · {memory.sourceDisplayName}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </details>
                 </article>
               ))
             )}
+            <div ref={conversationEndRef} />
           </div>
 
           <div className="patient-panel">
@@ -830,35 +900,50 @@ function App() {
 
             {patient ? (
               <>
-                <div className="patient-card">
-                  <span>Nom affiche</span>
-                  <strong>{patient.displayName || patient.display_name}</strong>
-                </div>
-                <div className="patient-card">
-                  <span>Nom prefere</span>
-                  <strong>{patient.preferredName || patient.preferred_name || "n/a"}</strong>
+                <div className="patient-identity">
+                  <div className="patient-avatar">
+                    {(
+                      patient.preferredName ||
+                      patient.preferred_name ||
+                      patient.displayName ||
+                      patient.display_name ||
+                      "?"
+                    )[0].toUpperCase()}
+                  </div>
+                  <div className="patient-identity-text">
+                    <div className="patient-name">
+                      {patient.displayName || patient.display_name}
+                    </div>
+                    <div className="patient-alias">
+                      {patient.preferredName || patient.preferred_name || "—"}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="list-block">
-                  <p>Reperes rassurants</p>
-                  {(patient.anchors || []).map((anchor) => (
-                    <span className="line-chip" key={anchor}>
-                      {anchor}
-                    </span>
-                  ))}
+                  <p>Repères rassurants</p>
+                  {(patient.anchors || []).length > 0 ? (
+                    (patient.anchors || []).map((anchor) => (
+                      <span className="line-chip" key={anchor}>{anchor}</span>
+                    ))
+                  ) : (
+                    <span className="memory-chip muted">Aucun repère défini</span>
+                  )}
                 </div>
 
                 <div className="list-block">
                   <p>Notes de soin</p>
-                  {(patient.careNotes || patient.care_notes || []).map((note) => (
-                    <span className="line-chip" key={note}>
-                      {note}
-                    </span>
-                  ))}
+                  {(patient.careNotes || patient.care_notes || []).length > 0 ? (
+                    (patient.careNotes || patient.care_notes || []).map((note) => (
+                      <span className="line-chip care-note" key={note}>{note}</span>
+                    ))
+                  ) : (
+                    <span className="memory-chip muted">Aucune note de soin</span>
+                  )}
                 </div>
               </>
             ) : (
-              <div className="empty-state">Snapshot invalide ou non charge.</div>
+              <div className="empty-state">Snapshot invalide ou non chargé.</div>
             )}
           </div>
         </section>
@@ -868,31 +953,22 @@ function App() {
 }
 
 function updateSetting(setSettings, key, value) {
-  setSettings((current) => ({
-    ...current,
-    [key]: value,
-  }));
+  setSettings((current) => ({ ...current, [key]: value }));
 }
 
 function buildOllamaTagsUrl(baseUrl) {
   const normalized = String(baseUrl || "").trim().replace(/\/+$/, "");
-  if (!normalized) {
-    return "";
-  }
+  if (!normalized) return "";
   const withoutChatPath = normalized.replace(/\/chat\/completions$/i, "");
   const withoutV1 = withoutChatPath.replace(/\/v1$/i, "");
   return `${withoutV1}/api/tags`;
 }
 
 function extractModelNames(payload) {
-  if (!payload || !Array.isArray(payload.models)) {
-    return [];
-  }
+  if (!payload || !Array.isArray(payload.models)) return [];
   return payload.models
     .map((item) => {
-      if (!item || typeof item !== "object") {
-        return "";
-      }
+      if (!item || typeof item !== "object") return "";
       return String(item.name || item.model || "").trim();
     })
     .filter(Boolean);
@@ -904,6 +980,12 @@ function createPlaybackId() {
 
 function formatMetric(value) {
   return value == null ? "n/a" : `${Math.round(value)} ms`;
+}
+
+function formatDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function mergeChunks(chunks) {
@@ -921,7 +1003,6 @@ function encodeWav(samples, sampleRate) {
   const bytesPerSample = 2;
   const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
   const view = new DataView(buffer);
-
   writeString(view, 0, "RIFF");
   view.setUint32(4, 36 + samples.length * bytesPerSample, true);
   writeString(view, 8, "WAVE");
@@ -935,28 +1016,26 @@ function encodeWav(samples, sampleRate) {
   view.setUint16(34, 16, true);
   writeString(view, 36, "data");
   view.setUint32(40, samples.length * bytesPerSample, true);
-
   let offset = 44;
-  for (let index = 0; index < samples.length; index += 1) {
-    const value = Math.max(-1, Math.min(1, samples[index]));
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = Math.max(-1, Math.min(1, samples[i]));
     view.setInt16(offset, value < 0 ? value * 0x8000 : value * 0x7fff, true);
     offset += bytesPerSample;
   }
-
   return buffer;
 }
 
 function writeString(view, offset, value) {
-  for (let index = 0; index < value.length; index += 1) {
-    view.setUint8(offset + index, value.charCodeAt(index));
+  for (let i = 0; i < value.length; i += 1) {
+    view.setUint8(offset + i, value.charCodeAt(i));
   }
 }
 
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = "";
-  for (let index = 0; index < bytes.byteLength; index += 1) {
-    binary += String.fromCharCode(bytes[index]);
+  for (let i = 0; i < bytes.byteLength; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
   }
   return window.btoa(binary);
 }

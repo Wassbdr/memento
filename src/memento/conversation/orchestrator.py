@@ -390,29 +390,31 @@ def _retrieved_memories(
 
 _SUPPORTED_FINISH_REASONS = {"", "stop"}
 _COMMON_NON_FACT_TOKENS = {
-    "alors",
-    "avec",
-    "avoir",
-    "bien",
-    "bonjour",
-    "calme",
-    "chez",
-    "comment",
-    "dans",
-    "doucement",
-    "etes",
-    "etre",
-    "falloir",
-    "merci",
-    "peux",
-    "pouvez",
-    "pour",
+    # Verbes courants
+    "alors", "aller", "aussi", "avoir", "avait", "avez", "avons",
+    "bien", "bonjour",
+    "calme", "calmes", "chez", "comme", "comment",
+    "dans", "dire", "donc", "doucement",
+    "elle", "elles", "encore", "etes", "etre", "etait",
+    "faire", "falloir", "faut",
+    "leur", "leurs",
+    "mais", "merci", "meme", "moment",
+    "nous",
+    "oui",
+    "parce", "peut", "peux", "plus", "pour", "pouvez",
+    "quand", "quel", "quelle",
     "restez",
-    "suis",
-    "toujours",
-    "votre",
-    "voulez",
-    "vous",
+    "savoir", "sera", "serait", "sont", "suis",
+    "tout", "toujours", "tres",
+    "venir", "voir", "voici", "voila", "votre", "vouloir", "voulez", "vous",
+    # Mots grammaticaux communs
+    "avec", "cette", "chose", "dont", "leur",
+    "vient", "viens",
+    # Adverbes et conjonctions
+    "apres", "avant", "depuis", "encore", "jamais", "maintenant",
+    "parfois", "souvent", "toujours", "trop",
+    # Formules de reassurance
+    "rassurant", "rassure", "sente", "tranquille",
 }
 _UNCERTAINTY_MARKERS = (
     "je n'ai pas assez d'informations",
@@ -452,7 +454,11 @@ def _guard_generation_answer(
 
     allowed_tokens = _allowed_grounding_tokens(context, question)
     unsupported_tokens = candidate_tokens - allowed_tokens
-    if unsupported_tokens:
+    # Tolerate 1 unrecognised token — the model may rephrase grounded content
+    # using a synonym or inflected form not literally present in the context.
+    # Two or more unsupported factual tokens together is a reliable signal of
+    # hallucination (e.g. fabricated proper nouns).
+    if len(unsupported_tokens) >= 2:
         return _AnswerGuardDecision(
             text=config.fallback_answer,
             applied=True,

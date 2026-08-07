@@ -11,7 +11,8 @@
   --cyan: #74ebff;
   --pink: #ff5e97;
   --amber: #ffc06b;
-  font-family: "IBM Plex Sans", sans-serif;
+  --green: #5affc8;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
   background:
     radial-gradient(circle at top left, rgba(75, 124, 255, 0.2), transparent 32%),
     radial-gradient(circle at top right, rgba(255, 94, 151, 0.18), transparent 28%),
@@ -36,7 +37,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -44,23 +46,57 @@ button {
   cursor: pointer;
 }
 
+/* ── Layout ─────────────────────────────── */
+
 .app-shell {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
   min-height: 100vh;
 }
 
-.config-panel {
-  padding: 1.5rem;
-  border-right: 1px solid var(--line);
-  background: rgba(4, 8, 14, 0.84);
-  backdrop-filter: blur(18px);
-  overflow: auto;
-}
-
 .main-panel {
   padding: 1.5rem;
 }
+
+/* ── Config panel ────────────────────────── */
+
+.config-panel {
+  padding: 1.5rem;
+  border-right: 1px solid var(--line);
+  background: rgba(4, 8, 14, 0.92);
+  backdrop-filter: blur(18px);
+  overflow: auto;
+  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Config toggle button – floats top-left */
+.config-toggle {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 100;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(8, 12, 20, 0.9);
+  color: var(--muted);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(12px);
+  transition: color 200ms, border-color 200ms, background 200ms;
+  display: none; /* shown only on small screens */
+}
+
+.config-toggle:hover {
+  color: var(--text);
+  border-color: rgba(122, 155, 255, 0.36);
+  background: rgba(14, 22, 36, 0.96);
+}
+
+/* ── Cards & shared surfaces ─────────────── */
 
 .hero-card,
 .composer-card,
@@ -71,6 +107,8 @@ button {
   background: linear-gradient(180deg, rgba(9, 15, 24, 0.88), rgba(7, 12, 19, 0.74));
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
 }
+
+/* ── Hero card ───────────────────────────── */
 
 .hero-card {
   padding: 1.4rem;
@@ -116,7 +154,7 @@ button {
 }
 
 .hero-copy h1 {
-  max-width: 12ch;
+  max-width: 16ch;
   font-size: clamp(2.4rem, 5vw, 4.9rem);
   line-height: 0.92;
 }
@@ -126,6 +164,20 @@ button {
   max-width: 54rem;
   color: var(--muted);
 }
+
+kbd {
+  display: inline-block;
+  padding: 0.1em 0.45em;
+  border: 1px solid rgba(122, 155, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(75, 124, 255, 0.1);
+  font-size: 0.88em;
+  font-family: "IBM Plex Mono", monospace;
+  letter-spacing: 0;
+  color: var(--cyan);
+}
+
+/* ── Orb ─────────────────────────────────── */
 
 .orb-stage {
   position: relative;
@@ -321,19 +373,22 @@ button {
   );
 }
 
-.orb-content strong {
+.orb-label {
   font-family: "Space Grotesk", sans-serif;
-  font-size: 1.2rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 1.4rem;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
 }
 
 .orb-content small {
   max-width: 11rem;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   text-align: center;
+  line-height: 1.3;
 }
+
+/* Orb state modifiers */
 
 .orb-button.is-recording .orb-ring-a {
   animation-duration: 2.4s;
@@ -403,12 +458,7 @@ button {
   opacity: 1;
 }
 
-.field small {
-  display: block;
-  margin-top: 0.55rem;
-  color: var(--muted);
-  line-height: 1.45;
-}
+/* ── Status grid ─────────────────────────── */
 
 .status-grid {
   position: relative;
@@ -418,25 +468,23 @@ button {
   gap: 0.85rem;
 }
 
-.status-card,
-.patient-card,
-.turn-card,
-.field,
-.list-block,
-.empty-state,
-.error-banner {
-  background: rgba(7, 12, 20, 0.72);
-  border: 1px solid rgba(122, 155, 255, 0.14);
-}
-
 .status-card {
   padding: 0.95rem 1rem;
   border-radius: 20px;
+  background: rgba(7, 12, 20, 0.72);
+  border: 1px solid rgba(122, 155, 255, 0.14);
+  transition: border-color 400ms;
 }
 
-.status-card span,
-.patient-card span,
-.metrics-row span {
+.status-card.status-ok {
+  border-color: rgba(90, 255, 200, 0.28);
+}
+
+.status-card.status-offline {
+  border-color: rgba(255, 94, 151, 0.28);
+}
+
+.status-card span {
   display: block;
   color: var(--muted);
   font-size: 0.76rem;
@@ -444,13 +492,20 @@ button {
   letter-spacing: 0.12em;
 }
 
-.status-card strong,
-.patient-card strong,
-.metrics-row strong {
+.status-card strong {
   display: block;
   margin-top: 0.35rem;
   font-family: "Space Grotesk", sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.status-model {
+  font-size: 0.85rem;
+}
+
+/* ── Composer ────────────────────────────── */
 
 .composer-card,
 .conversation-panel,
@@ -463,11 +518,13 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 140px;
   gap: 0.8rem;
+  margin-top: 0.85rem;
 }
 
 .composer-input,
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   border: 1px solid rgba(122, 155, 255, 0.18);
   border-radius: 18px;
@@ -475,11 +532,22 @@ button {
   color: var(--text);
   padding: 0.9rem 1rem;
   outline: none;
+  transition: border-color 200ms;
 }
+
+.composer-input:focus,
+.field input:focus,
+.field textarea:focus {
+  border-color: rgba(116, 235, 255, 0.38);
+}
+
+/* ── Config panel form fields ───────────── */
 
 .field {
   display: block;
   border-radius: 22px;
+  background: rgba(7, 12, 20, 0.72);
+  border: 1px solid rgba(122, 155, 255, 0.14);
   padding: 0.9rem;
   margin-top: 0.9rem;
 }
@@ -491,19 +559,33 @@ button {
   font-size: 0.82rem;
 }
 
+.field small {
+  display: block;
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .field textarea {
-  min-height: 14rem;
+  min-height: 12rem;
   resize: vertical;
 }
 
 .field-grid {
   display: grid;
-  gap: 0.85rem;
+  gap: 0;
 }
 
 .button-row {
   margin-top: 1rem;
 }
+
+.full-width {
+  width: 100%;
+}
+
+/* ── Buttons ─────────────────────────────── */
 
 .primary-button,
 .secondary-button {
@@ -512,6 +594,7 @@ button {
   padding: 0.8rem 1.1rem;
   border: 1px solid rgba(116, 235, 255, 0.16);
   color: var(--text);
+  transition: opacity 200ms, filter 200ms;
 }
 
 .primary-button {
@@ -522,30 +605,124 @@ button {
   background: rgba(10, 17, 28, 0.88);
 }
 
-.error-banner,
-.empty-state,
-.list-block,
-.patient-card,
-.turn-card {
-  border-radius: 22px;
+.primary-button:hover,
+.secondary-button:hover {
+  filter: brightness(1.12);
 }
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Error banner ────────────────────────── */
 
 .error-banner {
   margin-top: 0.85rem;
   padding: 0.9rem 1rem;
   color: #ffd9e5;
+  background: rgba(255, 94, 151, 0.1);
+  border: 1px solid rgba(255, 94, 151, 0.24);
+  border-radius: 22px;
 }
+
+/* ── Content grid ────────────────────────── */
 
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.9fr);
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
   gap: 1.2rem;
   margin-top: 1.2rem;
 }
 
+/* ── Panel header ────────────────────────── */
+
+.panel-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.panel-header .eyebrow {
+  width: 100%;
+}
+
+.panel-header h2 {
+  flex: 1;
+  margin: 0;
+}
+
+.clear-link {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 155, 255, 0.18);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  transition: color 180ms, border-color 180ms;
+}
+
+.clear-link:hover {
+  color: var(--text);
+  border-color: rgba(122, 155, 255, 0.36);
+}
+
+/* ── Thinking indicator ──────────────────── */
+
+.thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.85rem;
+  border-radius: 18px;
+  background: rgba(255, 192, 107, 0.06);
+  border: 1px solid rgba(255, 192, 107, 0.14);
+}
+
+.thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: thinkDot 1.2s ease-in-out infinite;
+}
+
+.thinking-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.thinking-label {
+  color: var(--amber);
+  font-size: 0.88rem;
+}
+
+@keyframes thinkDot {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* ── Turn cards ──────────────────────────── */
+
 .turn-card {
   padding: 1rem;
   margin-top: 1rem;
+  background: rgba(7, 12, 20, 0.72);
+  border: 1px solid rgba(122, 155, 255, 0.14);
+  border-radius: 22px;
+  animation: fadeSlideUp 280ms ease forwards;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .bubble {
@@ -554,20 +731,26 @@ button {
 }
 
 .bubble.user {
-  background: rgba(116, 235, 255, 0.08);
+  background: rgba(116, 235, 255, 0.06);
   border: 1px solid rgba(116, 235, 255, 0.14);
 }
 
 .bubble.assistant {
   margin-top: 0.8rem;
-  background: rgba(255, 94, 151, 0.08);
+  background: rgba(255, 94, 151, 0.06);
   border: 1px solid rgba(255, 94, 151, 0.14);
+}
+
+.bubble-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.7rem;
 }
 
 .bubble-label {
   display: inline-flex;
-  margin-bottom: 0.7rem;
-  padding: 0.32rem 0.7rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 999px;
   font-size: 0.74rem;
   letter-spacing: 0.08em;
@@ -577,14 +760,88 @@ button {
 
 .bubble p {
   margin: 0;
-  line-height: 1.55;
+  line-height: 1.6;
+}
+
+/* When bubble-label is not in a row (user bubble), keep the old bottom margin */
+.bubble.user .bubble-label {
+  display: inline-flex;
+  margin-bottom: 0.7rem;
+}
+
+.turn-audio {
+  width: 100%;
+  margin-top: 0.9rem;
+  border-radius: 12px;
+  height: 36px;
+}
+
+/* ── Copy button ─────────────────────────── */
+
+.copy-button {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 155, 255, 0.18);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.76rem;
+  transition: color 180ms, border-color 180ms, background 180ms;
+}
+
+.copy-button:hover {
+  color: var(--text);
+  border-color: rgba(122, 155, 255, 0.36);
+}
+
+.copy-button.copied {
+  color: var(--green);
+  border-color: rgba(90, 255, 200, 0.3);
+  background: rgba(90, 255, 200, 0.06);
+}
+
+/* ── Guard notice ────────────────────────── */
+
+.guard-notice {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 14px;
+  background: rgba(255, 192, 107, 0.08);
+  border: 1px solid rgba(255, 192, 107, 0.22);
+  color: var(--amber);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+/* ── Turn details / metrics ──────────────── */
+
+.turn-details {
+  margin-top: 0.85rem;
+}
+
+.turn-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  user-select: none;
+  padding: 0.4rem 0;
+  transition: color 180ms;
+}
+
+.turn-details summary:hover {
+  color: var(--text);
+}
+
+.turn-details[open] summary {
+  margin-bottom: 0.75rem;
 }
 
 .metrics-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
-  margin-top: 0.95rem;
+  margin-top: 0;
 }
 
 .metrics-row > div {
@@ -594,10 +851,22 @@ button {
   border: 1px solid rgba(122, 155, 255, 0.1);
 }
 
-.turn-card audio {
-  width: 100%;
-  margin-top: 0.95rem;
+.metrics-row span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
+
+.metrics-row strong {
+  display: block;
+  margin-top: 0.3rem;
+  font-family: "Space Grotesk", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Memory chips ────────────────────────── */
 
 .memory-zone {
   margin-top: 0.95rem;
@@ -628,25 +897,87 @@ button {
   border: 1px solid rgba(122, 155, 255, 0.16);
   background: rgba(75, 124, 255, 0.08);
   font-size: 0.84rem;
+  line-height: 1.2;
 }
 
 .memory-chip.muted {
   color: var(--muted);
 }
 
+.line-chip.care-note {
+  background: rgba(255, 192, 107, 0.07);
+  border-color: rgba(255, 192, 107, 0.2);
+  color: rgba(255, 220, 160, 0.9);
+}
+
 .inline-warning {
   margin: 0.85rem 0 0;
   color: #ffd5e1;
+  font-size: 0.88rem;
 }
 
-.patient-card {
+.empty-state {
+  padding: 1rem;
+  margin-top: 1rem;
+  color: var(--muted);
+  background: rgba(7, 12, 20, 0.72);
+  border: 1px solid rgba(122, 155, 255, 0.14);
+  border-radius: 22px;
+}
+
+/* ── Patient panel ───────────────────────── */
+
+.patient-identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
   padding: 0.95rem 1rem;
-  margin-top: 0.85rem;
+  background: rgba(7, 12, 20, 0.72);
+  border: 1px solid rgba(122, 155, 255, 0.14);
+  border-radius: 22px;
+}
+
+.patient-avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(75, 124, 255, 0.4), rgba(255, 94, 151, 0.3));
+  border: 1px solid rgba(122, 155, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.patient-identity-text {
+  min-width: 0;
+}
+
+.patient-name {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patient-alias {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .list-block {
   padding: 0.95rem;
   margin-top: 0.9rem;
+  background: rgba(7, 12, 20, 0.72);
+  border: 1px solid rgba(122, 155, 255, 0.14);
+  border-radius: 22px;
 }
 
 .list-block p {
@@ -658,182 +989,108 @@ button {
   font-size: 0.76rem;
 }
 
-.empty-state {
-  padding: 1rem;
-  margin-top: 1rem;
-  color: var(--muted);
-}
+/* ── Orb keyframes ───────────────────────── */
 
 @keyframes organHalo {
-  0%,
-  100% {
-    transform: translate3d(
-        calc(var(--orb-drift-x) * 0.16),
-        calc(var(--orb-drift-y) * 0.16),
-        0
-      )
-      rotate(0deg)
-      scale(calc(0.98 * var(--orb-halo-scale)));
+  0%, 100% {
+    transform: translate3d(calc(var(--orb-drift-x) * 0.16), calc(var(--orb-drift-y) * 0.16), 0)
+      rotate(0deg) scale(calc(0.98 * var(--orb-halo-scale)));
   }
   33% {
-    transform: translate3d(
-        calc(var(--orb-drift-x) * -0.08),
-        calc(var(--orb-drift-y) * 0.2),
-        0
-      )
-      rotate(9deg)
-      scale(calc(1.03 * var(--orb-halo-scale)), calc(0.97 * var(--orb-halo-scale)));
+    transform: translate3d(calc(var(--orb-drift-x) * -0.08), calc(var(--orb-drift-y) * 0.2), 0)
+      rotate(9deg) scale(calc(1.03 * var(--orb-halo-scale)), calc(0.97 * var(--orb-halo-scale)));
   }
   66% {
-    transform: translate3d(
-        calc(var(--orb-drift-x) * 0.18),
-        calc(var(--orb-drift-y) * -0.14),
-        0
-      )
-      rotate(-7deg)
-      scale(calc(0.97 * var(--orb-halo-scale)), calc(1.03 * var(--orb-halo-scale)));
+    transform: translate3d(calc(var(--orb-drift-x) * 0.18), calc(var(--orb-drift-y) * -0.14), 0)
+      rotate(-7deg) scale(calc(0.97 * var(--orb-halo-scale)), calc(1.03 * var(--orb-halo-scale)));
   }
 }
 
 @keyframes organShell {
-  0%,
-  100% {
+  0%, 100% {
     transform: translate3d(var(--orb-shell-shift-x), var(--orb-shell-shift-y), 0)
-      rotate(0deg)
-      scale(calc(1 + var(--orb-wave) * 0.012));
+      rotate(0deg) scale(calc(1 + var(--orb-wave) * 0.012));
     border-radius: 46% 54% 49% 51% / 45% 44% 56% 55%;
   }
   50% {
-    transform: translate3d(
-        calc(var(--orb-shell-shift-x) * -0.7),
-        calc(var(--orb-shell-shift-y) * -0.7),
-        0
-      )
-      rotate(-5deg)
-      scale(calc(1.02 + var(--orb-wave) * 0.02));
+    transform: translate3d(calc(var(--orb-shell-shift-x) * -0.7), calc(var(--orb-shell-shift-y) * -0.7), 0)
+      rotate(-5deg) scale(calc(1.02 + var(--orb-wave) * 0.02));
     border-radius: 52% 48% 44% 56% / 42% 55% 45% 58%;
   }
 }
 
 @keyframes organBreath {
-  0%,
-  100% {
+  0%, 100% {
     transform: translate3d(var(--orb-core-shift-x), var(--orb-core-shift-y), 0)
       scale(calc(0.985 + var(--orb-wave) * 0.016));
     border-radius: 48% 52% 50% 50% / 46% 44% 56% 54%;
   }
   50% {
-    transform: translate3d(
-        calc(var(--orb-core-shift-x) * -0.72),
-        calc(var(--orb-core-shift-y) * -0.72),
-        0
-      )
+    transform: translate3d(calc(var(--orb-core-shift-x) * -0.72), calc(var(--orb-core-shift-y) * -0.72), 0)
       scale(calc(1.025 + var(--orb-wave) * 0.024));
     border-radius: 54% 46% 46% 54% / 42% 56% 44% 58%;
   }
 }
 
 @keyframes organThink {
-  0%,
-  100% {
+  0%, 100% {
     transform: translate3d(var(--orb-core-shift-x), var(--orb-core-shift-y), 0)
-      scale(calc(0.98 + var(--orb-wave) * 0.018))
-      rotate(0deg);
+      scale(calc(0.98 + var(--orb-wave) * 0.018)) rotate(0deg);
     border-radius: 48% 52% 50% 50% / 46% 44% 56% 54%;
   }
   30% {
-    transform: translate3d(
-        calc(var(--orb-core-shift-x) * -0.9),
-        calc(var(--orb-core-shift-y) * 0.56),
-        0
-      )
-      scale(calc(1.035 + var(--orb-wave) * 0.028), calc(0.99 + var(--orb-wave) * 0.016))
-      rotate(-4deg);
+    transform: translate3d(calc(var(--orb-core-shift-x) * -0.9), calc(var(--orb-core-shift-y) * 0.56), 0)
+      scale(calc(1.035 + var(--orb-wave) * 0.028), calc(0.99 + var(--orb-wave) * 0.016)) rotate(-4deg);
     border-radius: 56% 44% 48% 52% / 40% 58% 42% 60%;
   }
   70% {
-    transform: translate3d(
-        calc(var(--orb-core-shift-x) * 0.66),
-        calc(var(--orb-core-shift-y) * -0.88),
-        0
-      )
-      scale(calc(0.99 + var(--orb-wave) * 0.016), calc(1.04 + var(--orb-wave) * 0.03))
-      rotate(4deg);
+    transform: translate3d(calc(var(--orb-core-shift-x) * 0.66), calc(var(--orb-core-shift-y) * -0.88), 0)
+      scale(calc(0.99 + var(--orb-wave) * 0.016), calc(1.04 + var(--orb-wave) * 0.03)) rotate(4deg);
     border-radius: 42% 58% 54% 46% / 58% 42% 60% 40%;
   }
 }
 
 @keyframes organSpeak {
-  0%,
-  100% {
+  0%, 100% {
     transform: translate3d(var(--orb-core-shift-x), var(--orb-core-shift-y), 0)
       scale(calc(0.98 + var(--speech-level) * 0.12 + var(--orb-wave) * 0.018));
     border-radius: 46% 54% 50% 50% / 44% 46% 54% 56%;
   }
   25% {
-    transform: translate3d(
-        calc(var(--orb-core-shift-x) * -0.84),
-        calc(var(--orb-core-shift-y) * 0.7),
-        0
-      )
+    transform: translate3d(calc(var(--orb-core-shift-x) * -0.84), calc(var(--orb-core-shift-y) * 0.7), 0)
       scale(calc(1.01 + var(--speech-level) * 0.14 + var(--orb-wave) * 0.022));
     border-radius: 58% 42% 46% 54% / 38% 60% 40% 62%;
   }
   50% {
-    transform: translate3d(
-        calc(var(--orb-core-shift-x) * 0.62),
-        calc(var(--orb-core-shift-y) * -0.78),
-        0
-      )
+    transform: translate3d(calc(var(--orb-core-shift-x) * 0.62), calc(var(--orb-core-shift-y) * -0.78), 0)
       scale(calc(1.03 + var(--speech-level) * 0.16 + var(--orb-wave) * 0.026));
     border-radius: 42% 58% 58% 42% / 60% 38% 62% 40%;
   }
   75% {
-    transform: translate3d(
-        calc(var(--orb-core-shift-x) * -0.3),
-        calc(var(--orb-core-shift-y) * -0.22),
-        0
-      )
+    transform: translate3d(calc(var(--orb-core-shift-x) * -0.3), calc(var(--orb-core-shift-y) * -0.22), 0)
       scale(calc(1 + var(--speech-level) * 0.13 + var(--orb-wave) * 0.02));
     border-radius: 52% 48% 44% 56% / 46% 54% 42% 58%;
   }
 }
 
 @keyframes organVeins {
-  0%,
-  100% {
-    transform: translate3d(
-        calc(var(--orb-core-shift-x) * -0.28),
-        calc(var(--orb-core-shift-y) * -0.28),
-        0
-      )
-      rotate(var(--orb-spectrum-tilt))
-      scale(calc(0.99 + var(--orb-wave) * 0.014));
+  0%, 100% {
+    transform: translate3d(calc(var(--orb-core-shift-x) * -0.28), calc(var(--orb-core-shift-y) * -0.28), 0)
+      rotate(var(--orb-spectrum-tilt)) scale(calc(0.99 + var(--orb-wave) * 0.014));
   }
   50% {
-    transform: translate3d(
-        calc(var(--orb-core-shift-x) * 0.16),
-        calc(var(--orb-core-shift-y) * 0.16),
-        0
-      )
-      rotate(calc(var(--orb-spectrum-tilt) + 7deg))
-      scale(calc(1.03 + var(--orb-wave) * 0.02));
+    transform: translate3d(calc(var(--orb-core-shift-x) * 0.16), calc(var(--orb-core-shift-y) * 0.16), 0)
+      rotate(calc(var(--orb-spectrum-tilt) + 7deg)) scale(calc(1.03 + var(--orb-wave) * 0.02));
   }
 }
 
 @keyframes organPulseRing {
-  0% {
-    transform: scale(0.84);
-    opacity: 0;
-  }
-  18% {
-    opacity: 0.3;
-  }
-  100% {
-    transform: scale(1.14);
-    opacity: 0;
-  }
+  0% { transform: scale(0.84); opacity: 0; }
+  18% { opacity: 0.3; }
+  100% { transform: scale(1.14); opacity: 0; }
 }
+
+/* ── Responsive ──────────────────────────── */
 
 @media (max-width: 1100px) {
   .app-shell {
@@ -841,8 +1098,26 @@ button {
   }
 
   .config-panel {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: min(340px, 90vw);
+    z-index: 90;
+    border-right: 1px solid var(--line);
+    transform: translateX(-100%);
+  }
+
+  .config-panel.is-open {
+    transform: translateX(0);
+  }
+
+  .config-toggle {
+    display: flex;
+  }
+
+  .main-panel {
+    padding-top: 4rem;
   }
 
   .content-grid {
@@ -864,5 +1139,9 @@ button {
   .metrics-row,
   .composer-row {
     grid-template-columns: 1fr;
+  }
+
+  .orb-button {
+    width: min(72vw, 300px);
   }
 }

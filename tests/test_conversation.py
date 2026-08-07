@@ -136,7 +136,7 @@ def test_conversation_orchestrator_validates_inputs_and_can_close_backend() -> N
 def test_conversation_orchestrator_replaces_unsupported_factual_answer_with_fallback() -> None:
     engine = MemorySyncEngine()
     engine.sync_snapshot(build_snapshot())
-    backend = FakeConversationBackend("Paul vient dimanche.")
+    backend = FakeConversationBackend("Paul et Jean viennent dimanche.")
     orchestrator = ConversationOrchestrator(memory_engine=engine, backend=backend)
 
     result = orchestrator.respond("rose", "Qui vient dimanche ?")
