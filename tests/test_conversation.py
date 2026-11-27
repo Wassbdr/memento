@@ -199,3 +199,25 @@ def test_conversation_config_validates_positive_limits() -> None:
 
     with pytest.raises(ValueError, match="fallback_answer"):
         ConversationConfig(fallback_answer="   ")
+
+
+def test_conversation_orchestrator_grounding_guard_folds_french_accents() -> None:
+    engine = MemorySyncEngine()
+    engine.sync_snapshot(build_snapshot())
+    backend = FakeConversationBackend("Claire vient déjeuner dimanche, ne vous inquiétez pas.")
+    orchestrator = ConversationOrchestrator(memory_engine=engine, backend=backend)
+
+    result = orchestrator.respond("rose", "Qui vient dejeuner dimanche ?")
+
+    assert result.trace.guard_applied is False
+
+
+def test_conversation_orchestrator_grounding_guard_rejects_accented_hallucination() -> None:
+    engine = MemorySyncEngine()
+    engine.sync_snapshot(build_snapshot())
+    backend = FakeConversationBackend("Claire vient pour une dégustation à Évian.")
+    orchestrator = ConversationOrchestrator(memory_engine=engine, backend=backend)
+
+    result = orchestrator.respond("rose", "Qui vient dimanche ?")
+
+    assert result.trace.guard_applied is True
