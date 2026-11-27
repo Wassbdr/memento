@@ -415,7 +415,9 @@ _COMMON_NON_FACT_TOKENS = {
     "apres", "avant", "depuis", "encore", "jamais", "maintenant",
     "parfois", "souvent", "toujours", "trop",
     # Formules de reassurance
-    "rassurant", "rassure", "sente", "tranquille",
+    "rassurant", "rassurante", "rassurants", "rassure", "sente", "tranquille",
+    # Elisions francaises
+    "c'est", "n'est", "qu'il", "qu'elle", "j'ai", "c'etait", "s'appelle",
 }
 _UNCERTAINTY_MARKERS = (
     "je n'ai pas assez d'informations",

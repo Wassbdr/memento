@@ -221,3 +221,14 @@ def test_conversation_orchestrator_grounding_guard_rejects_accented_hallucinatio
     result = orchestrator.respond("rose", "Qui vient dimanche ?")
 
     assert result.trace.guard_applied is True
+
+
+def test_conversation_orchestrator_grounding_guard_ignores_french_elisions() -> None:
+    engine = MemorySyncEngine()
+    engine.sync_snapshot(build_snapshot())
+    backend = FakeConversationBackend("C'est Claire qui vient dimanche, c'est rassurant.")
+    orchestrator = ConversationOrchestrator(memory_engine=engine, backend=backend)
+
+    result = orchestrator.respond("rose", "Qui vient dimanche ?")
+
+    assert result.trace.guard_applied is False
