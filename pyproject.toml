@@ -40,6 +40,7 @@ explicit = true
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = ["stack: needs the docker compose stack (Neo4j, ChromaDB, Ollama)"]
 
 [build-system]
 requires = ["hatchling"]
