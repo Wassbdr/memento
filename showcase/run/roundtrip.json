@@ -1,0 +1,364 @@
+{
+  "generated_at": "2026-11-27T06:03:57+00:00",
+  "seed": 7,
+  "hardware": "Intel(R) Xeon(R) Processor, 8 vCPU, 31 GB RAM, no GPU",
+  "python": "3.12.16",
+  "models": {
+    "stt": "openai-whisper small (CPU, fp32)",
+    "embeddings": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "llm": "qwen2.5:0.5b via Ollama (CPU, temperature 0)",
+    "tts": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice (CPU, fp32)",
+    "stores": "Neo4j 5.26 + ChromaDB 1.0 (docker compose)"
+  },
+  "load_seconds": {
+    "whisper": 3.34,
+    "tts_with_warmup": 8.88
+  },
+  "turns": [
+    {
+      "question_id": "q1_sunday",
+      "question_text": "Qui vient déjeuner avec moi le dimanche ?",
+      "question_wav": "q1_sunday.wav",
+      "question_audio_s": 2.4,
+      "transcript": "Qui vient déjeuner avec moi le dimanche?",
+      "answer": "Sylvie Garnier vient déjeuner tous les dimanches à midi et apporte un dessert.",
+      "answer_wav": "q1_sunday_answer.wav",
+      "answer_audio_s": 5.04,
+      "guard_applied": false,
+      "grounded": true,
+      "expected_terms": [
+        "Sylvie"
+      ],
+      "retrieved": [
+        {
+          "id": "patient:demo-patient",
+          "name": "Paulette Garnier",
+          "score": 1.192
+        },
+        {
+          "id": "routine:sunday_lunch",
+          "name": "Déjeuner du dimanche",
+          "score": 0.711
+        },
+        {
+          "id": "person:daughter",
+          "name": "Sylvie Garnier",
+          "score": 0.696
+        }
+      ],
+      "related_nodes": [
+        "patient:demo-patient",
+        "routine:sunday_lunch",
+        "person:daughter"
+      ],
+      "timings_s": {
+        "stt": 5.03,
+        "retrieval": 0.04,
+        "llm": 1.16,
+        "tts": 9.33
+      }
+    },
+    {
+      "question_id": "q2_grandson",
+      "question_text": "Comment s'appelle mon petit-fils ?",
+      "question_wav": "q2_grandson.wav",
+      "question_audio_s": 2.24,
+      "transcript": "Comment s'appelle mon petit-fils?",
+      "answer": "Hugo Garnier",
+      "answer_wav": "q2_grandson_answer.wav",
+      "answer_audio_s": 2.56,
+      "guard_applied": false,
+      "grounded": true,
+      "expected_terms": [
+        "Hugo"
+      ],
+      "retrieved": [
+        {
+          "id": "patient:demo-patient",
+          "name": "Paulette Garnier",
+          "score": 1.122
+        },
+        {
+          "id": "person:son",
+          "name": "Philippe Garnier",
+          "score": 0.629
+        },
+        {
+          "id": "person:grandson",
+          "name": "Hugo Garnier",
+          "score": 0.624
+        }
+      ],
+      "related_nodes": [
+        "patient:demo-patient",
+        "person:son",
+        "person:grandson"
+      ],
+      "timings_s": {
+        "stt": 2.13,
+        "retrieval": 0.04,
+        "llm": 1.24,
+        "tts": 10.94
+      }
+    },
+    {
+      "question_id": "q3_birthday",
+      "question_text": "Où est-ce que j'ai fêté mes quatre-vingts ans ?",
+      "question_wav": "q3_birthday.wav",
+      "question_audio_s": 2.8,
+      "transcript": "Où est-ce que j'ai fêté mes 80 ans?",
+      "answer": "Vous avez fêté vos 80 ans à La Guinguette du Lac en 2026-05-06. Vous avez passé l'été avec votre famille, Sylvie Garnier, Philippe Garnier, Hugo Garnier.",
+      "answer_wav": "q3_birthday_answer.wav",
+      "answer_audio_s": 11.84,
+      "guard_applied": false,
+      "grounded": true,
+      "expected_terms": [
+        "Guinguette"
+      ],
+      "retrieved": [
+        {
+          "id": "episode:birthday_80",
+          "name": "Les quatre-vingts ans de Paulette",
+          "score": 1.154
+        },
+        {
+          "id": "episode:seaside_holidays",
+          "name": "Vacances à Port-Marin",
+          "score": 0.914
+        },
+        {
+          "id": "person:daughter",
+          "name": "Sylvie Garnier",
+          "score": 0.561
+        }
+      ],
+      "related_nodes": [
+        "episode:birthday_80",
+        "episode:seaside_holidays",
+        "person:daughter"
+      ],
+      "timings_s": {
+        "stt": 3.19,
+        "retrieval": 0.05,
+        "llm": 2.08,
+        "tts": 27.94
+      }
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "emotion:birthday_80:1:joie",
+        "label": "Emotion",
+        "name": "joie"
+      },
+      {
+        "id": "emotion:grandson_visit:1:fierté",
+        "label": "Emotion",
+        "name": "fierté"
+      },
+      {
+        "id": "emotion:seaside_holidays:1:nostalgie",
+        "label": "Emotion",
+        "name": "nostalgie"
+      },
+      {
+        "id": "episode:birthday_80",
+        "label": "Episode",
+        "name": "Les quatre-vingts ans de Paulette"
+      },
+      {
+        "id": "episode:grandson_visit",
+        "label": "Episode",
+        "name": "Visite de Hugo"
+      },
+      {
+        "id": "episode:seaside_holidays",
+        "label": "Episode",
+        "name": "Vacances à Port-Marin"
+      },
+      {
+        "id": "patient:demo-patient",
+        "label": "Patient",
+        "name": "Paulette"
+      },
+      {
+        "id": "person:aide",
+        "label": "Person",
+        "name": "Fatou Diallo"
+      },
+      {
+        "id": "person:daughter",
+        "label": "Person",
+        "name": "Sylvie Garnier"
+      },
+      {
+        "id": "person:grandson",
+        "label": "Person",
+        "name": "Hugo Garnier"
+      },
+      {
+        "id": "person:neighbour",
+        "label": "Person",
+        "name": "Monique Perrin"
+      },
+      {
+        "id": "person:son",
+        "label": "Person",
+        "name": "Philippe Garnier"
+      },
+      {
+        "id": "place:guinguette",
+        "label": "Place",
+        "name": "La Guinguette du Lac"
+      },
+      {
+        "id": "place:home",
+        "label": "Place",
+        "name": "Appartement rue des Tilleuls"
+      },
+      {
+        "id": "place:kitchen",
+        "label": "Place",
+        "name": "Cuisine"
+      },
+      {
+        "id": "place:seaside",
+        "label": "Place",
+        "name": "Port-Marin"
+      },
+      {
+        "id": "routine:morning_meds",
+        "label": "Routine",
+        "name": "Médicaments du matin"
+      },
+      {
+        "id": "routine:sunday_lunch",
+        "label": "Routine",
+        "name": "Déjeuner du dimanche"
+      }
+    ],
+    "edges": [
+      {
+        "source": "patient:demo-patient",
+        "target": "person:daughter",
+        "type": "KNOWS"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "person:son",
+        "type": "KNOWS"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "person:grandson",
+        "type": "KNOWS"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "person:neighbour",
+        "type": "KNOWS"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "person:aide",
+        "type": "KNOWS"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "routine:sunday_lunch",
+        "type": "FOLLOWS_ROUTINE"
+      },
+      {
+        "source": "routine:sunday_lunch",
+        "target": "place:kitchen",
+        "type": "HAPPENS_AT"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "routine:morning_meds",
+        "type": "FOLLOWS_ROUTINE"
+      },
+      {
+        "source": "routine:morning_meds",
+        "target": "place:kitchen",
+        "type": "HAPPENS_AT"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "episode:birthday_80",
+        "type": "REMEMBERS"
+      },
+      {
+        "source": "episode:birthday_80",
+        "target": "person:daughter",
+        "type": "INVOLVES"
+      },
+      {
+        "source": "episode:birthday_80",
+        "target": "person:son",
+        "type": "INVOLVES"
+      },
+      {
+        "source": "episode:birthday_80",
+        "target": "person:grandson",
+        "type": "INVOLVES"
+      },
+      {
+        "source": "episode:birthday_80",
+        "target": "place:guinguette",
+        "type": "TOOK_PLACE_AT"
+      },
+      {
+        "source": "episode:birthday_80",
+        "target": "emotion:birthday_80:1:joie",
+        "type": "EVOKES"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "episode:grandson_visit",
+        "type": "REMEMBERS"
+      },
+      {
+        "source": "episode:grandson_visit",
+        "target": "person:grandson",
+        "type": "INVOLVES"
+      },
+      {
+        "source": "episode:grandson_visit",
+        "target": "place:kitchen",
+        "type": "TOOK_PLACE_AT"
+      },
+      {
+        "source": "episode:grandson_visit",
+        "target": "emotion:grandson_visit:1:fierté",
+        "type": "EVOKES"
+      },
+      {
+        "source": "patient:demo-patient",
+        "target": "episode:seaside_holidays",
+        "type": "REMEMBERS"
+      },
+      {
+        "source": "episode:seaside_holidays",
+        "target": "person:daughter",
+        "type": "INVOLVES"
+      },
+      {
+        "source": "episode:seaside_holidays",
+        "target": "person:son",
+        "type": "INVOLVES"
+      },
+      {
+        "source": "episode:seaside_holidays",
+        "target": "place:seaside",
+        "type": "TOOK_PLACE_AT"
+      },
+      {
+        "source": "episode:seaside_holidays",
+        "target": "emotion:seaside_holidays:1:nostalgie",
+        "type": "EVOKES"
+      }
+    ]
+  }
+}

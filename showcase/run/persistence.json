@@ -1,0 +1,26 @@
+{
+  "question": "Qui vient déjeuner avec moi le dimanche ?",
+  "expected_terms": [
+    "Sylvie"
+  ],
+  "before": {
+    "answer": "Sylvie Garnier vient déjeuner tous les dimanches à midi et apporte un dessert.",
+    "guard_applied": false,
+    "retrieved": [
+      "patient:demo-patient",
+      "routine:sunday_lunch",
+      "person:daughter"
+    ]
+  },
+  "after": {
+    "answer": "Sylvie Garnier vient déjeuner tous les dimanches à midi et apporte un dessert.",
+    "guard_applied": false,
+    "retrieved": [
+      "patient:demo-patient",
+      "routine:sunday_lunch",
+      "person:daughter"
+    ]
+  },
+  "restart_seconds": 16.4,
+  "passed": true
+}

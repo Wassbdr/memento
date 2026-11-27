@@ -1,0 +1,83 @@
+{
+  "slug": "memento",
+  "title": "Memento",
+  "tagline": "A local, screen-free voice assistant that answers a person with Alzheimer's disease from their own memory graph.",
+  "problem": "People with Alzheimer's disease ask the same orienting questions many times a day: who is coming, where am I, who is this person. Generic assistants do not know their family or routines, and a wrong answer is worse than none.",
+  "approach": "Caregivers fill a personal knowledge graph (relatives, places, routines, dated memories) stored in Neo4j and indexed in ChromaDB. A spoken question is transcribed by Whisper, the graph and vector stores return the relevant memories with an explainable clinical score, a small local LLM answers from that context only, a grounding guard rejects unsupported names, and Qwen3-TTS speaks the answer.",
+  "stack": [
+    "Python",
+    "Neo4j",
+    "ChromaDB",
+    "sentence-transformers",
+    "Ollama",
+    "Qwen2.5",
+    "openai-whisper",
+    "Qwen3-TTS",
+    "Docker Compose",
+    "pytest"
+  ],
+  "demo": {
+    "gif": "showcase/demo.gif",
+    "mp4": "showcase/demo.mp4",
+    "poster": "showcase/poster.png",
+    "kind": "replay",
+    "caption": "Three spoken questions from a fictitious patient: the transcript, the memory graph nodes retrieved from Neo4j/ChromaDB, then the spoken answer, with per-stage CPU timings. Rendered from the run recorded by showcase/make_showcase.sh."
+  },
+  "reproduce": [
+    "docker compose up -d && docker compose exec ollama ollama pull qwen2.5:0.5b",
+    "uv sync --all-extras",
+    "bash showcase/make_showcase.sh"
+  ],
+  "results": [
+    {
+      "label": "Answers citing the expected memory (Whisper -> graph RAG -> LLM -> TTS)",
+      "value": "3/3",
+      "command": "bash showcase/make_showcase.sh",
+      "setup": "3 questions on a fictitious patient (seed 7), Intel(R) Xeon(R) Processor, 8 vCPU, 31 GB RAM, no GPU"
+    },
+    {
+      "label": "Median voice round trip on CPU (STT + retrieval + LLM + TTS)",
+      "value": "15.4 s",
+      "command": "bash showcase/make_showcase.sh",
+      "setup": "3 questions on a fictitious patient (seed 7), Intel(R) Xeon(R) Processor, 8 vCPU, 31 GB RAM, no GPU"
+    },
+    {
+      "label": "Median Whisper small transcription",
+      "value": "3.19 s",
+      "command": "bash showcase/make_showcase.sh",
+      "setup": "3 questions on a fictitious patient (seed 7), Intel(R) Xeon(R) Processor, 8 vCPU, 31 GB RAM, no GPU"
+    },
+    {
+      "label": "Median Graph RAG retrieval (Neo4j + ChromaDB)",
+      "value": "0.04 s",
+      "command": "bash showcase/make_showcase.sh",
+      "setup": "3 questions on a fictitious patient (seed 7), Intel(R) Xeon(R) Processor, 8 vCPU, 31 GB RAM, no GPU"
+    },
+    {
+      "label": "Median qwen2.5:0.5b answer via Ollama",
+      "value": "1.24 s",
+      "command": "bash showcase/make_showcase.sh",
+      "setup": "3 questions on a fictitious patient (seed 7), Intel(R) Xeon(R) Processor, 8 vCPU, 31 GB RAM, no GPU"
+    },
+    {
+      "label": "Median Qwen3-TTS 0.6B answer synthesis",
+      "value": "10.94 s",
+      "command": "bash showcase/make_showcase.sh",
+      "setup": "3 questions on a fictitious patient (seed 7), Intel(R) Xeon(R) Processor, 8 vCPU, 31 GB RAM, no GPU"
+    },
+    {
+      "label": "Same answer from stored memory after restarting Neo4j, ChromaDB and Ollama",
+      "value": "pass",
+      "command": "MEMENTO_STACK_TESTS=1 uv run pytest -m stack",
+      "setup": "docker compose restart (16.4 s), fresh clients, seed 7"
+    }
+  ],
+  "limits": [
+    "CPU-only timings: answer TTS dominates the latency (about 10 s per short sentence).",
+    "qwen2.5:0.5b sometimes adds loosely grounded details; the grounding guard tolerates one unknown token, so small slips (a wrong time) can pass.",
+    "Demo data is a single fictitious patient; no clinical evaluation has been done.",
+    "Live microphone mode and the React runtime are not exercised by the showcase run."
+  ],
+  "role": "TODO",
+  "repo": "https://github.com/Wassbdr/memento"
+}
