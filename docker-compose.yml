@@ -1,0 +1,33 @@
+# Memento memory + LLM stack (CPU only).
+#   docker compose up -d          # Neo4j graph, ChromaDB index, Ollama LLM
+#   docker compose exec ollama ollama pull qwen2.5:1.5b
+services:
+  neo4j:
+    image: mirror.gcr.io/library/neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/memento-demo
+      NEO4J_server_memory_heap_max__size: 1G
+    ports: ["7474:7474", "7687:7687"]
+    volumes: [neo4j-data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null || exit 1"]
+      interval: 5s
+      retries: 30
+
+  chroma:
+    image: ghcr.io/chroma-core/chroma:1.0.15
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    ports: ["8001:8000"]
+    volumes: [chroma-data:/data]
+
+  ollama:
+    image: ollama/ollama:0.6.8
+    ports: ["11434:11434"]
+    volumes: [ollama-models:/root/.ollama]
+
+volumes:
+  neo4j-data:
+  chroma-data:
+  ollama-models:

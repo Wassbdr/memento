@@ -1,12 +1,72 @@
 # Memento
 
+Assistant vocal local, sans écran ni bouton, qui répond aux questions d'une personne atteinte d'Alzheimer à partir de son propre graphe de souvenirs (proches, lieux, routines, événements datés) — pour les aidants, les familles et les équipes qui construisent des aides cognitives.
+
+![Démo : question parlée, souvenirs retrouvés dans le graphe, réponse parlée](showcase/demo.gif)
+
+*Rejoue un run réel enregistré par `showcase/make_showcase.sh` (version avec le son : [`showcase/demo.mp4`](showcase/demo.mp4)). Patiente et proches fictifs.*
+
+```bash
+docker compose up -d && docker compose exec ollama ollama pull qwen2.5:0.5b   # Neo4j + ChromaDB + LLM local
+uv sync --all-extras && uv run python -m memento.demo seed                    # charge la patiente fictive dans les vrais stores
+uv run python -m memento.demo ask "Qui vient déjeuner avec moi le dimanche ?"
+```
+
+## Résultats clés
+
+Mesurés par `bash showcase/make_showcase.sh` · 3 questions parlées, patiente fictive (seed 7) · Intel Xeon 8 vCPU, 31 GB RAM, **sans GPU**.
+
+| Mesure | Valeur |
+|---|---|
+| Réponses qui citent le bon souvenir (voix → voix) | **3/3** |
+| Même réponse depuis la mémoire stockée après redémarrage de Neo4j, ChromaDB et Ollama | **oui** (`MEMENTO_STACK_TESTS=1 uv run pytest -m stack`) |
+| Aller-retour vocal médian sur CPU | **15,4 s** |
+| Whisper `small` (transcription) | 3,19 s |
+| Graph RAG Neo4j + ChromaDB (récupération + contexte) | 0,04 s |
+| LLM `qwen2.5:0.5b` via Ollama | 1,24 s |
+| Qwen3-TTS 0.6B (synthèse de la réponse) | 10,94 s |
+| Tests unitaires (`uv run pytest`) | 106 passés, 1 test de stack réel opt-in |
+
+![Pipeline et temps par étape](showcase/poster.png)
+
+## Comment ça marche
+
+```mermaid
+flowchart LR
+    Q[Question parlée] --> W[Whisper STT]
+    W --> R[Graph RAG]
+    R <--> C[(ChromaDB<br/>vecteurs)]
+    R <--> N[(Neo4j<br/>graphe de souvenirs)]
+    R --> L[LLM local<br/>Ollama]
+    L --> G{Garde-fou<br/>ancrage}
+    G --> T[Qwen3-TTS]
+    T --> A[Réponse parlée]
+```
+
+Les aidants remplissent un graphe personnel (`PatientMemorySnapshot`) écrit dans Neo4j et indexé dans ChromaDB. La question transcrite par Whisper récupère les souvenirs pertinents avec un score clinique explicable ; le LLM répond uniquement à partir de ce contexte ; un garde-fou remplace toute réponse qui cite des noms ou des faits absents de la mémoire ; Qwen3-TTS lit la réponse.
+
+### Démo de bout en bout (`python -m memento.demo`)
+
+| Commande | Effet |
+|---|---|
+| `snapshot` | affiche le graphe fictif généré (seed fixe) |
+| `seed` | l'écrit dans Neo4j + ChromaDB |
+| `ask "…"` | répond à une question texte depuis les stores |
+| `questions` | synthétise les questions en WAV avec Qwen3-TTS (sans micro) |
+| `roundtrip` | WAV → Whisper → graph RAG → LLM → TTS, enregistre réponses audio, transcriptions et temps |
+| `persistence` | pose la question, redémarre la stack, la repose |
+
+Les variables `NEO4J_URI`, `CHROMA_PORT`, `MEMENTO_LLM_BASE_URL`, `MEMENTO_LLM_MODEL`… (voir `src/memento/demo/stack.py`) permettent de viser un autre LLM compatible OpenAI.
+
+## Détails
+
 Memento est une prothèse cognitive vocale destinée aux patients atteints de la maladie d'Alzheimer. L'idée centrale est simple : donner au patient un accès permanent, à portée de voix, à sa propre mémoire personnelle. Un compagnon vocal qui connaît ses proches, ses habitudes, ses souvenirs et ses routines, et peut y répondre à tout moment de manière naturelle et rassurante, sans écran, sans bouton, sans aucune interaction cognitive requise.
 
 La mémoire du patient est alimentée de deux façons : par les aidants et la famille via une application dédiée, et de manière automatique en captant le contexte des interactions quotidiennes (visites, conversations, émotions) avec le consentement de chacun. Ce contexte vivant est stocké dans un graphe de mémoire personnalisé et affectif, bien au-delà de ce que peut offrir n'importe quel assistant généraliste.
 
 Le projet vise à réduire les moments de confusion et d'angoisse, à préserver l'autonomie le plus longtemps possible, et à soulager les aidants. Dans un second temps, une couche visuelle, idéalement via des lunettes connectées, permettra à l'assistant de reconnaître les visages en temps réel et d'enrichir encore davantage le contexte de chaque interaction.
 
-## Architecture du pipeline
+### Architecture du pipeline
 
 ```
 Microphone
@@ -17,14 +77,14 @@ LlamaIndex  (orchestration RAG)
     ↓
 ChromaDB ←→ Neo4j  (index sémantique ↔ graphe de mémoire)
     ↓
-Ministral 3 8B  (LLM de raisonnement)
+LLM local compatible OpenAI (Ministral 3 8B visé ; qwen2.5:0.5b pour la démo CPU)
     ↓
 Qwen3-TTS  (Text-to-Speech voix clonée)
     ↓
 Haut-parleur
 ```
 
-## Fonctionnement de la memoire
+### Fonctionnement de la memoire
 
 La memoire suit une logique knowledge graph + recherche semantique.
 
@@ -49,7 +109,7 @@ La memoire suit une logique knowledge graph + recherche semantique.
 Voir la documentation detaillee de la couche memory:
 - `src/memento/memory/README.md`
 
-## Chemin de la donnee
+### Chemin de la donnee
 
 Chemin ecriture:
 
@@ -69,7 +129,7 @@ Chemin lecture:
 -> contexte de reorientation
 -> generation de reponse vocale
 
-## Orchestration conversationnelle
+### Orchestration conversationnelle
 
 La couche conversationnelle relie la memoire au modele de generation.
 
@@ -134,7 +194,7 @@ print(response.context.patient_display_name)
 print(response.trace.retrieved_memories)
 ```
 
-## Runtime bout-en-bout
+### Runtime bout-en-bout
 
 Le depot contient maintenant un runtime live qui chaine:
 
@@ -196,7 +256,7 @@ Options utiles:
 - `--disable-interrupt-on-speech`
 - `--max-frames` pour un smoke test court
 
-## Front runtime React
+### Front runtime React
 
 Le runtime dispose maintenant d'un front React avec une grande sphere centrale, une capture micro navigateur, un fallback texte, et une integration HTTP vers le pipeline Python.
 
@@ -225,21 +285,21 @@ Le front permet de regler :
 - le modele Whisper
 - la configuration Qwen TTS
 
-## Comment tester
+### Comment tester
 
-### Installer l'environnement
+#### Installer l'environnement
 
 ```bash
-uv sync
+uv sync --all-extras
 ```
 
-### Lancer les tests unitaires
+#### Lancer les tests unitaires
 
 ```bash
 uv run python -m pytest
 ```
 
-### Tester la transcription micro avec Streamlit
+#### Tester la transcription micro avec Streamlit
 
 ```bash
 uv run streamlit run experimentations/streamlit_whisper_app.py
@@ -261,7 +321,7 @@ Notes :
 - les modeles `tiny`, `base` ou `small` restent utiles pour des essais rapides
 - le projet pinne maintenant `torch` sur l'index PyTorch `cu128` pour eviter qu'un `uv sync` reinstalle un build CPU-only
 
-### Tester le TTS avec Streamlit
+#### Tester le TTS avec Streamlit
 
 Installer d'abord le runtime local recommande pour `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` :
 
@@ -283,7 +343,7 @@ Notes :
 - le front expose `speaker`, `langue` et `instruction` pour le mode `CustomVoice`
 - le chemin `wav` reste le plus simple pour les essais locaux
 
-### Utiliser la restitution vocale
+#### Utiliser la restitution vocale
 
 Verifier d'abord que `qwen-tts` et ses dependances runtime sont installes.
 
@@ -321,3 +381,11 @@ pipeline = VoiceResponsePipeline(
 result = pipeline.speak("Bonjour Charles, je suis la pour t'aider.")
 print(result.metrics.end_to_end_latency_ms, result.meets_targets)
 ```
+
+## Roadmap et limites connues
+
+- Sur CPU, la synthèse vocale domine la latence (~11 s pour une phrase courte) ; un GPU ou un TTS plus léger est nécessaire pour un échange naturel.
+- `qwen2.5:0.5b` ajoute parfois des détails mal ancrés ; le garde-fou tolère un mot inconnu, donc une petite erreur (une heure) peut passer.
+- Une seule patiente fictive ; aucune évaluation clinique n'a été menée.
+- Le mode micro live (`python -m memento.runtime`) et le front React ne sont pas exercés par le run du showcase.
+- Le CI n'est pas encore en place : les dépendances `torch` CUDA rendent l'installation lourde sur un runner standard.

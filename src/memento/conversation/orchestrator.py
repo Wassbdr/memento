@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import re
 from time import perf_counter
+import unicodedata
 
 from memento.memory import EmotionalState, MemorySyncEngine, PatientReorientationContext
 
@@ -414,7 +415,9 @@ _COMMON_NON_FACT_TOKENS = {
     "apres", "avant", "depuis", "encore", "jamais", "maintenant",
     "parfois", "souvent", "toujours", "trop",
     # Formules de reassurance
-    "rassurant", "rassure", "sente", "tranquille",
+    "rassurant", "rassurante", "rassurants", "rassure", "sente", "tranquille",
+    # Elisions francaises
+    "c'est", "n'est", "qu'il", "qu'elle", "j'ai", "c'etait", "s'appelle",
 }
 _UNCERTAINTY_MARKERS = (
     "je n'ai pas assez d'informations",
@@ -476,7 +479,7 @@ def _guard_generation_answer(
 
 
 def _contains_uncertainty_marker(text: str) -> bool:
-    normalized = text.strip().lower()
+    normalized = _fold_accents(text.strip().lower()).replace("\u2019", "'")
     return any(marker in normalized for marker in _UNCERTAINTY_MARKERS)
 
 
@@ -539,9 +542,14 @@ def _allowed_grounding_tokens(
     return {token for fragment in grounded_fragments for token in _tokenize(fragment)}
 
 
+def _fold_accents(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
 def _tokenize(text: str) -> tuple[str, ...]:
     return tuple(
         token.lower()
-        for token in re.findall(r"[A-Za-z0-9']+", text)
+        for token in re.findall(r"[A-Za-z0-9']+", _fold_accents(text or ""))
         if token.strip()
     )

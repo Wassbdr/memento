@@ -3,7 +3,7 @@ name = "memento"
 version = "0.1.0"
 description = "Prototype d'assistant vocal memoire pour patients atteints de la maladie d'Alzheimer."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "openai-whisper>=20250625",
     "pillow<12",
@@ -40,6 +40,7 @@ explicit = true
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = ["stack: needs the docker compose stack (Neo4j, ChromaDB, Ollama)"]
 
 [build-system]
 requires = ["hatchling"]
